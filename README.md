@@ -1,5 +1,9 @@
 # @veil-cash/sdk
 
+[![npm version](https://img.shields.io/npm/v/@veil-cash/sdk.svg)](https://www.npmjs.com/package/@veil-cash/sdk)
+[![npm downloads](https://img.shields.io/npm/dm/@veil-cash/sdk.svg)](https://www.npmjs.com/package/@veil-cash/sdk)
+[![license](https://img.shields.io/npm/l/@veil-cash/sdk.svg)](https://github.com/veildotcash/veildotcash-sdk/blob/main/LICENSE)
+
 SDK and CLI for interacting with [Veil Cash](https://veil.cash) privacy pools on Base.
 
 Generate keypairs, register, deposit, withdraw, and transfer ETH privately.
