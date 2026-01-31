@@ -1,0 +1,70 @@
+{
+  "name": "@veil-cash/sdk",
+  "version": "0.1.0",
+  "description": "SDK and CLI for interacting with Veil Cash privacy pools - keypair generation, deposits, and status checking",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "veil": "./dist/cli/index.cjs"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "keys",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist",
+    "test": "node test.mjs"
+  },
+  "keywords": [
+    "veil",
+    "privacy",
+    "ethereum",
+    "base",
+    "zk",
+    "sdk",
+    "cli",
+    "crypto",
+    "deposit"
+  ],
+  "author": "Veil Cash",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/veildotcash/veildotcash-sdk"
+  },
+  "dependencies": {
+    "circomlib": "github:tornadocash/circomlib#d20d53411d1bef61f38c99a8b36d5d0cc4836aa1",
+    "commander": "^14.0.2",
+    "dotenv": "^17.2.3",
+    "eth-sig-util": "^3.0.1",
+    "ethers": "^6.15.0",
+    "ffjavascript": "^0.3.1",
+    "fixed-merkle-tree-legacy": "npm:fixed-merkle-tree@^0.5.1",
+    "snarkjs": "^0.7.6",
+    "viem": "^2.33.3",
+    "web3-utils": "^1.10.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.17.2",
+    "@types/snarkjs": "^0.7.9",
+    "tsup": "^8.0.0",
+    "typescript": "^5.9.2"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
