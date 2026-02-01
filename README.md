@@ -6,7 +6,7 @@
 
 SDK and CLI for interacting with [Veil Cash](https://veil.cash) privacy pools on Base.
 
-Generate keypairs, register, deposit, withdraw, and transfer ETH privately.
+Generate keypairs, register, deposit, withdraw, transfer, and merge ETH privately.
 
 ## Installation
 
@@ -35,17 +35,23 @@ export WALLET_KEY=0x...
 # 3. Register your deposit key (one-time)
 veil register
 
-# 4. Deposit ETH
-veil deposit 0.1
+# 4. Check your setup
+veil status
 
-# 5. Check your balance
+# 5. Deposit ETH
+veil deposit ETH 0.1
+
+# 6. Check your balance
 veil balance
 
-# 6. Withdraw to any address
-veil withdraw 0.05 0xRecipientAddress
+# 7. Withdraw to any address
+veil withdraw ETH 0.05 0xRecipientAddress
 
-# 7. Transfer privately to another registered user
-veil transfer 0.02 0xRecipientAddress
+# 8. Transfer privately to another registered user
+veil transfer ETH 0.02 0xRecipientAddress
+
+# 9. Merge small UTXOs (consolidate balances)
+veil merge ETH 0.1
 ```
 
 ## CLI Commands
@@ -64,11 +70,41 @@ veil init --no-save    # Print keypair without saving
 
 ### `veil keypair`
 
-Generate and show a new keypair as JSON (does not save).
+Show current Veil keypair as JSON (from VEIL_KEY env).
 
 ```bash
 veil keypair
 # {"veilPrivateKey":"0x...","depositKey":"0x..."}
+```
+
+### `veil status`
+
+Check configuration and service status.
+
+```bash
+veil status
+```
+
+Output:
+```json
+{
+  "walletKey": { "found": true, "address": "0x..." },
+  "veilKey": { "found": true },
+  "depositKey": { "found": true, "key": "0x1234...abcd" },
+  "rpcUrl": { "found": false, "url": "https://mainnet.base.org" },
+  "registration": {
+    "checked": true,
+    "registered": true,
+    "matches": true,
+    "onChainKey": "0x..."
+  },
+  "relay": {
+    "checked": true,
+    "healthy": true,
+    "status": "ok",
+    "network": "mainnet"
+  }
+}
 ```
 
 ### `veil register`
@@ -81,14 +117,14 @@ veil register --json                       # JSON output
 veil register --unsigned --address 0x...   # Unsigned payload for agents
 ```
 
-### `veil deposit <amount>`
+### `veil deposit ETH <amount>`
 
 Deposit ETH into the privacy pool.
 
 ```bash
-veil deposit 0.1                    # Signs & sends (JSON output)
-veil deposit 0.1 --unsigned         # Unsigned payload for agents
-veil deposit 0.1 --quiet            # Suppress progress output
+veil deposit ETH 0.1                    # Signs & sends (JSON output)
+veil deposit ETH 0.1 --unsigned         # Unsigned payload for agents
+veil deposit ETH 0.1 --quiet            # Suppress progress output
 ```
 
 Output:
@@ -138,13 +174,13 @@ Output:
 }
 ```
 
-### `veil withdraw <amount> <recipient>`
+### `veil withdraw ETH <amount> <recipient>`
 
 Withdraw from the privacy pool to any public address.
 
 ```bash
-veil withdraw 0.05 0xRecipientAddress
-veil withdraw 0.05 0xRecipientAddress --quiet
+veil withdraw ETH 0.05 0xRecipientAddress
+veil withdraw ETH 0.05 0xRecipientAddress --quiet
 ```
 
 Output:
@@ -159,13 +195,13 @@ Output:
 }
 ```
 
-### `veil transfer <amount> <recipient>`
+### `veil transfer ETH <amount> <recipient>`
 
 Transfer privately to another registered Veil user.
 
 ```bash
-veil transfer 0.02 0xRecipientAddress
-veil transfer 0.02 0xRecipientAddress --quiet
+veil transfer ETH 0.02 0xRecipientAddress
+veil transfer ETH 0.02 0xRecipientAddress --quiet
 ```
 
 Output:
@@ -180,13 +216,24 @@ Output:
 }
 ```
 
-### `veil merge <amount>`
+### `veil merge ETH <amount>`
 
 Consolidate multiple small UTXOs into one (self-transfer).
 
 ```bash
-veil merge 0.1                      # Merge UTXOs totaling 0.1 ETH
-veil merge 0.1 --quiet
+veil merge ETH 0.1                      # Merge UTXOs totaling 0.1 ETH
+veil merge ETH 0.1 --quiet
+```
+
+Output:
+```json
+{
+  "success": true,
+  "transactionHash": "0x...",
+  "blockNumber": 12345678,
+  "amount": "0.1",
+  "type": "merge"
+}
 ```
 
 ## Environment Variables
@@ -391,11 +438,11 @@ veil init --json
 
 # Get unsigned transaction payloads for agent signing
 veil register --unsigned --address 0x...
-veil deposit 0.1 --unsigned
+veil deposit ETH 0.1 --unsigned
 
 # Suppress progress output for clean JSON
 veil balance --quiet
-veil withdraw 0.05 0xRecipient --quiet
+veil withdraw ETH 0.05 0xRecipient --quiet
 ```
 
 ### Bankr Integration
@@ -403,7 +450,7 @@ veil withdraw 0.05 0xRecipient --quiet
 Use `--unsigned` to get Bankr-compatible transaction payloads:
 
 ```bash
-veil deposit 0.1 --unsigned
+veil deposit ETH 0.1 --unsigned
 # {"to":"0x...","data":"0x...","value":"100000000000000000","chainId":8453}
 ```
 
@@ -435,14 +482,15 @@ const result = await withdraw({
 
 1. **Generate Keypair**: Run `veil init` to create and save your Veil keypair
 2. **Register**: Run `veil register` to link your deposit key on-chain (one-time)
-3. **Deposit**: Run `veil deposit <amount>` to send ETH
-4. **Wait**: The Veil deposit engine processes your deposit
-5. **Done**: Your deposit is accepted into the privacy pool
+3. **Check Status**: Run `veil status` to verify your setup
+4. **Deposit**: Run `veil deposit ETH <amount>` to send ETH
+5. **Wait**: The Veil deposit engine processes your deposit
+6. **Done**: Your deposit is accepted into the privacy pool
 
 ## Withdrawal Flow
 
 1. **Check Balance**: Run `veil balance` to see your private balance
-2. **Withdraw**: Run `veil withdraw <amount> <recipient>`
+2. **Withdraw**: Run `veil withdraw ETH <amount> <recipient>`
 3. **Done**: The SDK builds ZK proofs and submits via the relayer
 
 ## License

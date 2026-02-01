@@ -17,13 +17,19 @@ function progress(msg: string, quiet?: boolean) {
 export function createTransferCommand(): Command {
   const transferCmd = new Command('transfer')
     .description('Transfer privately within the pool to another registered address')
+    .argument('<asset>', 'Asset to transfer (ETH)')
     .argument('<amount>', 'Amount to transfer (e.g., 0.1)')
     .argument('<recipient>', 'Recipient address (must be registered)')
     .option('--veil-key <key>', 'Veil private key (or set VEIL_KEY env)')
     .option('--rpc-url <url>', 'RPC URL (or set RPC_URL env)')
     .option('--quiet', 'Suppress progress output')
-    .action(async (amount: string, recipient: string, options) => {
+    .action(async (asset: string, amount: string, recipient: string, options) => {
       try {
+        // Validate asset is ETH
+        if (asset.toUpperCase() !== 'ETH') {
+          throw new CLIError(ErrorCode.INVALID_AMOUNT, 'Only ETH is supported');
+        }
+
         // Validate recipient
         if (!/^0x[a-fA-F0-9]{40}$/.test(recipient)) {
           throw new CLIError(ErrorCode.INVALID_ADDRESS, 'Invalid recipient address format');
@@ -82,12 +88,18 @@ export function createTransferCommand(): Command {
 export function createMergeCommand(): Command {
   const mergeCmd = new Command('merge')
     .description('Merge UTXOs by self-transfer (consolidate small UTXOs)')
+    .argument('<asset>', 'Asset to merge (ETH)')
     .argument('<amount>', 'Amount to merge (e.g., 0.5)')
     .option('--veil-key <key>', 'Veil private key (or set VEIL_KEY env)')
     .option('--rpc-url <url>', 'RPC URL (or set RPC_URL env)')
     .option('--quiet', 'Suppress progress output')
-    .action(async (amount: string, options) => {
+    .action(async (asset: string, amount: string, options) => {
       try {
+        // Validate asset is ETH
+        if (asset.toUpperCase() !== 'ETH') {
+          throw new CLIError(ErrorCode.INVALID_AMOUNT, 'Only ETH is supported');
+        }
+
         // Get keypair
         const veilKey = options.veilKey || process.env.VEIL_KEY;
         if (!veilKey) {

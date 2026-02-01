@@ -17,13 +17,19 @@ function progress(msg: string, quiet?: boolean) {
 export function createWithdrawCommand(): Command {
   const withdrawCmd = new Command('withdraw')
     .description('Withdraw from private pool to a public address')
+    .argument('<asset>', 'Asset to withdraw (ETH)')
     .argument('<amount>', 'Amount to withdraw (e.g., 0.1)')
     .argument('<recipient>', 'Recipient address (e.g., 0x...)')
     .option('--veil-key <key>', 'Veil private key (or set VEIL_KEY env)')
     .option('--rpc-url <url>', 'RPC URL (or set RPC_URL env)')
     .option('--quiet', 'Suppress progress output')
-    .action(async (amount: string, recipient: string, options) => {
+    .action(async (asset: string, amount: string, recipient: string, options) => {
       try {
+        // Validate asset is ETH
+        if (asset.toUpperCase() !== 'ETH') {
+          throw new CLIError(ErrorCode.INVALID_AMOUNT, 'Only ETH is supported');
+        }
+
         // Validate recipient
         if (!/^0x[a-fA-F0-9]{40}$/.test(recipient)) {
           throw new CLIError(ErrorCode.INVALID_ADDRESS, 'Invalid recipient address format');

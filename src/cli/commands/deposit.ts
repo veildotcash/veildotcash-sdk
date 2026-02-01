@@ -25,14 +25,20 @@ function progress(msg: string, quiet?: boolean) {
 export function createDepositCommand(): Command {
   const deposit = new Command('deposit')
     .description('Deposit ETH into Veil')
+    .argument('<asset>', 'Asset to deposit (ETH)')
     .argument('<amount>', 'Amount to deposit (e.g., 0.1)')
     .option('--deposit-key <key>', 'Your Veil deposit key (or set DEPOSIT_KEY env)')
     .option('--wallet-key <key>', 'Ethereum wallet key for signing (or set WALLET_KEY env)')
     .option('--rpc-url <url>', 'RPC URL (or set RPC_URL env)')
     .option('--unsigned', 'Output unsigned transaction payload (Bankr-compatible format)')
     .option('--quiet', 'Suppress progress output')
-    .action(async (amount: string, options) => {
+    .action(async (asset: string, amount: string, options) => {
       try {
+        // Validate asset is ETH
+        if (asset.toUpperCase() !== 'ETH') {
+          throw new CLIError(ErrorCode.INVALID_AMOUNT, 'Only ETH is supported');
+        }
+
         const amountNum = parseFloat(amount);
         
         // Check minimum deposit
