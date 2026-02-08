@@ -44,6 +44,8 @@ export {
   buildDepositETHTx,
   buildDepositUSDCTx,
   buildApproveUSDCTx,
+  buildDepositBTCTx,
+  buildApproveBTCTx,
   buildDepositTx,
 } from './deposit.js';
 
@@ -99,7 +101,9 @@ export type { ProofInput } from './prover.js';
 export { 
   ADDRESSES, 
   POOL_CONFIG, 
-  getAddresses, 
+  getAddresses,
+  getPoolAddress,
+  getQueueAddress,
   getRelayUrl,
 } from './addresses.js';
 

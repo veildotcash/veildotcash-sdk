@@ -4,14 +4,19 @@
 
 import { Command } from 'commander';
 import { getQueueBalance, getPrivateBalance } from '../../balance.js';
+import { POOL_CONFIG } from '../../addresses.js';
 import { Keypair } from '../../keypair.js';
 import { getAddress } from '../wallet.js';
-import { formatEther } from 'viem';
+import { formatUnits } from 'viem';
 import { handleCLIError, CLIError, ErrorCode } from '../errors.js';
+import type { RelayPool } from '../../types.js';
+
+const SUPPORTED_POOLS = ['eth', 'usdc', 'btc'];
 
 export function createBalanceCommand(): Command {
   const balance = new Command('balance')
     .description('Show queue and private balances')
+    .option('--pool <pool>', 'Pool to check (eth, usdc, or btc)', 'eth')
     .option('--wallet-key <key>', 'Ethereum wallet key (or set WALLET_KEY env)')
     .option('--address <address>', 'Address to check (or derived from wallet key)')
     .option('--veil-key <key>', 'Veil private key (or set VEIL_KEY env)')
@@ -19,6 +24,15 @@ export function createBalanceCommand(): Command {
     .option('--quiet', 'Suppress progress output')
     .action(async (options) => {
       try {
+        const pool = (options.pool || 'eth').toLowerCase() as RelayPool;
+
+        // Validate pool
+        if (!SUPPORTED_POOLS.includes(pool)) {
+          throw new CLIError(ErrorCode.INVALID_AMOUNT, `Unsupported pool: ${options.pool}. Supported: ${SUPPORTED_POOLS.join(', ')}`);
+        }
+
+        const poolConfig = POOL_CONFIG[pool];
+
         // Get address
         let address: `0x${string}`;
         if (options.address) {
@@ -46,12 +60,12 @@ export function createBalanceCommand(): Command {
             };
 
         // Get queue balance
-        const queueResult = await getQueueBalance({ address, rpcUrl, onProgress });
+        const queueResult = await getQueueBalance({ address, pool, rpcUrl, onProgress });
 
         // Get private balance if keypair available
         let privateResult = null;
         if (keypair) {
-          privateResult = await getPrivateBalance({ keypair, rpcUrl, onProgress });
+          privateResult = await getPrivateBalance({ keypair, pool, rpcUrl, onProgress });
         }
 
         // Clear progress line
@@ -70,8 +84,10 @@ export function createBalanceCommand(): Command {
         // Build output structure
         const output: Record<string, unknown> = {
           address,
+          pool: pool.toUpperCase(),
+          symbol: poolConfig.symbol,
           depositKey: depositKey || null,
-          totalBalance: formatEther(totalBalanceWei),
+          totalBalance: formatUnits(totalBalanceWei, poolConfig.decimals),
           totalBalanceWei: totalBalanceWei.toString(),
         };
 

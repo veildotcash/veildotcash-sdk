@@ -5,7 +5,7 @@
 /**
  * Supported tokens
  */
-export type Token = 'ETH' | 'USDC';
+export type Token = 'ETH' | 'USDC' | 'BTC';
 
 /**
  * Encrypted message format (x25519-xsalsa20-poly1305)
@@ -27,6 +27,9 @@ export interface NetworkAddresses {
   usdcPool: `0x${string}`;
   usdcQueue: `0x${string}`;
   usdcToken: `0x${string}`;
+  btcPool: `0x${string}`;
+  btcQueue: `0x${string}`;
+  btcToken: `0x${string}`;
   chainId: number;
   relayUrl: string;
 }
@@ -118,7 +121,7 @@ export interface PrivateBalanceResult {
 /**
  * Pool type for relay operations
  */
-export type RelayPool = 'eth' | 'usdc';
+export type RelayPool = 'eth' | 'usdc' | 'btc';
 
 /**
  * Type of relay transaction
@@ -223,6 +226,8 @@ export interface BuildWithdrawProofOptions {
   recipient: `0x${string}`;
   /** User's keypair for signing */
   keypair: import('./keypair.js').Keypair;
+  /** Pool to withdraw from (default: 'eth') */
+  pool?: RelayPool;
   /** Optional RPC URL */
   rpcUrl?: string;
   /** Progress callback */
@@ -239,6 +244,8 @@ export interface BuildTransferProofOptions {
   recipientAddress: `0x${string}`;
   /** Sender's keypair */
   senderKeypair: import('./keypair.js').Keypair;
+  /** Pool to transfer in (default: 'eth') */
+  pool?: RelayPool;
   /** Optional RPC URL */
   rpcUrl?: string;
   /** Progress callback */

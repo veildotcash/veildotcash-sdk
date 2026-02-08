@@ -5,16 +5,20 @@
 import { Command } from 'commander';
 import { getPrivateBalance } from '../../balance.js';
 import { Keypair } from '../../keypair.js';
+import type { RelayPool } from '../../types.js';
 
 export function createPrivateBalanceCommand(): Command {
   const privateBalance = new Command('private-balance')
     .description('Show private balance (requires VEIL_KEY)')
+    .option('--pool <pool>', 'Pool to check (eth, usdc, or btc)', 'eth')
     .option('--veil-key <key>', 'Veil private key (or set VEIL_KEY env)')
     .option('--rpc-url <url>', 'RPC URL (or set RPC_URL env)')
     .option('--show-utxos', 'Show individual UTXO details')
     .option('--quiet', 'Suppress progress output')
     .action(async (options) => {
       try {
+        const pool = (options.pool || 'eth').toLowerCase() as RelayPool;
+
         // Get keypair
         const veilKey = options.veilKey || process.env.VEIL_KEY;
         if (!veilKey) {
@@ -33,7 +37,7 @@ export function createPrivateBalanceCommand(): Command {
             };
 
         // Get private balance from SDK
-        const result = await getPrivateBalance({ keypair, rpcUrl, onProgress });
+        const result = await getPrivateBalance({ keypair, pool, rpcUrl, onProgress });
 
         // Clear progress line
         if (!options.quiet) {
@@ -42,6 +46,7 @@ export function createPrivateBalanceCommand(): Command {
 
         // Format output
         const output: Record<string, unknown> = {
+          pool: pool.toUpperCase(),
           privateBalance: result.privateBalance,
           privateBalanceWei: result.privateBalanceWei,
           utxoCount: result.utxoCount,

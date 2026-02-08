@@ -5,7 +5,7 @@
 
 import { createPublicClient, http, parseUnits, formatUnits } from 'viem';
 import { base } from 'viem/chains';
-import { getAddresses, POOL_CONFIG } from './addresses.js';
+import { getPoolAddress, POOL_CONFIG } from './addresses.js';
 import { POOL_ABI } from './abi.js';
 import { Keypair } from './keypair.js';
 import { Utxo } from './utxo.js';
@@ -143,18 +143,19 @@ export async function buildWithdrawProof(
     amount,
     recipient,
     keypair,
+    pool = 'eth',
     rpcUrl,
     onProgress,
   } = options;
 
-  const addresses = getAddresses();
-  const poolConfig = POOL_CONFIG.eth;
-  const poolAddress = addresses.ethPool;
+  const poolConfig = POOL_CONFIG[pool];
+  const poolAddress = getPoolAddress(pool);
 
   // 1. Get user's unspent UTXOs
   onProgress?.('Fetching your UTXOs...');
   const balanceResult = await getPrivateBalance({
     keypair,
+    pool,
     rpcUrl,
     onProgress,
   });
@@ -269,7 +270,7 @@ export async function buildWithdrawProof(
 export async function withdraw(
   options: BuildWithdrawProofOptions
 ): Promise<WithdrawResult> {
-  const { amount, recipient, onProgress } = options;
+  const { amount, recipient, pool = 'eth', onProgress } = options;
 
   // Build the proof
   const proof = await buildWithdrawProof(options);
@@ -278,7 +279,7 @@ export async function withdraw(
   onProgress?.('Submitting to relay...');
   const relayResult = await submitRelay({
     type: 'withdraw',
-    pool: 'eth',
+    pool,
     proofArgs: proof.proofArgs,
     extData: proof.extData,
     metadata: {

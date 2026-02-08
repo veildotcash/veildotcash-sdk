@@ -6,6 +6,9 @@ import { Command } from 'commander';
 import { Keypair } from '../../keypair.js';
 import { withdraw } from '../../withdraw.js';
 import { handleCLIError, CLIError, ErrorCode } from '../errors.js';
+import type { RelayPool } from '../../types.js';
+
+const SUPPORTED_ASSETS = ['ETH', 'USDC', 'BTC'];
 
 // Progress helper - writes to stderr so JSON output stays clean
 function progress(msg: string, quiet?: boolean) {
@@ -17,7 +20,7 @@ function progress(msg: string, quiet?: boolean) {
 export function createWithdrawCommand(): Command {
   const withdrawCmd = new Command('withdraw')
     .description('Withdraw from private pool to a public address')
-    .argument('<asset>', 'Asset to withdraw (ETH)')
+    .argument('<asset>', 'Asset to withdraw (ETH, USDC, or BTC)')
     .argument('<amount>', 'Amount to withdraw (e.g., 0.1)')
     .argument('<recipient>', 'Recipient address (e.g., 0x...)')
     .option('--veil-key <key>', 'Veil private key (or set VEIL_KEY env)')
@@ -25,9 +28,11 @@ export function createWithdrawCommand(): Command {
     .option('--quiet', 'Suppress progress output')
     .action(async (asset: string, amount: string, recipient: string, options) => {
       try {
-        // Validate asset is ETH
-        if (asset.toUpperCase() !== 'ETH') {
-          throw new CLIError(ErrorCode.INVALID_AMOUNT, 'Only ETH is supported');
+        const assetUpper = asset.toUpperCase();
+
+        // Validate asset
+        if (!SUPPORTED_ASSETS.includes(assetUpper)) {
+          throw new CLIError(ErrorCode.INVALID_AMOUNT, `Unsupported asset: ${asset}. Supported: ${SUPPORTED_ASSETS.join(', ')}`);
         }
 
         // Validate recipient
@@ -43,6 +48,7 @@ export function createWithdrawCommand(): Command {
 
         const keypair = new Keypair(veilKey);
         const rpcUrl = options.rpcUrl || process.env.RPC_URL;
+        const pool = assetUpper.toLowerCase() as RelayPool;
 
         // Progress callback
         const onProgress = options.quiet
@@ -52,13 +58,14 @@ export function createWithdrawCommand(): Command {
               progress(msg, options.quiet);
             };
 
-        progress('Starting withdrawal...', options.quiet);
+        progress(`Starting ${assetUpper} withdrawal...`, options.quiet);
 
         // Execute withdrawal
         const result = await withdraw({
           amount,
           recipient: recipient as `0x${string}`,
           keypair,
+          pool,
           rpcUrl,
           onProgress,
         });
@@ -71,6 +78,7 @@ export function createWithdrawCommand(): Command {
           success: result.success,
           transactionHash: result.transactionHash,
           blockNumber: result.blockNumber,
+          asset: assetUpper,
           amount: result.amount,
           recipient: result.recipient,
         }, null, 2));

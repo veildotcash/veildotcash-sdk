@@ -83,6 +83,18 @@ export const ENTRY_ABI = [
     type: 'function',
   },
 
+  // Queue BTC deposit
+  {
+    inputs: [
+      { name: '_amount', type: 'uint256' },
+      { name: '_depositKey', type: 'bytes' },
+    ],
+    name: 'queueBTC',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+
   // Read deposit keys
   {
     inputs: [{ name: '', type: 'address' }],

@@ -145,7 +145,65 @@ export function buildDepositUSDCTx(options: {
 }
 
 /**
- * Build a deposit transaction (ETH or USDC)
+ * Build a transaction to approve BTC (cbBTC) for deposit
+ * Must be called before depositBTC if allowance is insufficient
+ * 
+ * @param options - Approval options
+ * @param options.amount - Amount to approve (human readable, e.g., '0.5')
+ * @returns Transaction data
+ */
+export function buildApproveBTCTx(options: {
+  amount: string;
+}): TransactionData {
+  const { amount } = options;
+  const addresses = getAddresses();
+  
+  const amountWei = parseUnits(amount, POOL_CONFIG.btc.decimals);
+  
+  const data = encodeFunctionData({
+    abi: ERC20_ABI,
+    functionName: 'approve',
+    args: [addresses.entry, amountWei],
+  });
+
+  return {
+    to: addresses.btcToken,
+    data,
+  };
+}
+
+/**
+ * Build a transaction to deposit BTC (cbBTC)
+ * Note: You must approve BTC first using buildApproveBTCTx
+ * 
+ * @param options - Deposit options
+ * @param options.depositKey - Deposit key from Keypair.depositKey()
+ * @param options.amount - Amount to deposit (human readable, e.g., '0.5')
+ * @returns Transaction data
+ */
+export function buildDepositBTCTx(options: {
+  depositKey: string;
+  amount: string;
+}): TransactionData {
+  const { depositKey, amount } = options;
+  const addresses = getAddresses();
+  
+  const amountWei = parseUnits(amount, POOL_CONFIG.btc.decimals);
+  
+  const data = encodeFunctionData({
+    abi: ENTRY_ABI,
+    functionName: 'queueBTC',
+    args: [amountWei, depositKey as `0x${string}`],
+  });
+
+  return {
+    to: addresses.entry,
+    data,
+  };
+}
+
+/**
+ * Build a deposit transaction (ETH, USDC, or BTC)
  * Convenience function that routes to the correct builder
  * 
  * @param options - Deposit options
@@ -166,6 +224,13 @@ export function buildDepositUSDCTx(options: {
  *   amount: '100',
  *   token: 'USDC',
  * });
+ * 
+ * // BTC deposit (remember to approve first!)
+ * const btcTx = buildDepositTx({
+ *   depositKey: keypair.depositKey(),
+ *   amount: '0.5',
+ *   token: 'BTC',
+ * });
  * ```
  */
 export function buildDepositTx(options: {
@@ -177,6 +242,10 @@ export function buildDepositTx(options: {
   
   if (token === 'USDC') {
     return buildDepositUSDCTx(rest);
+  }
+
+  if (token === 'BTC') {
+    return buildDepositBTCTx(rest);
   }
   
   return buildDepositETHTx(rest);
