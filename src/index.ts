@@ -46,8 +46,8 @@ export {
   buildDepositETHTx,
   buildDepositUSDCTx,
   buildApproveUSDCTx,
-  buildDepositBTCTx,
-  buildApproveBTCTx,
+  buildDepositCBBTCTx,
+  buildApproveCBBTCTx,
   buildDepositTx,
 } from './deposit.js';
 

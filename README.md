@@ -6,7 +6,7 @@
 
 SDK and CLI for interacting with [Veil Cash](https://veil.cash) privacy pools on Base.
 
-Generate keypairs, register, deposit, withdraw, transfer, and merge ETH, USDC, and BTC privately.
+Generate keypairs, register, deposit, withdraw, transfer, and merge ETH, USDC, and cbBTC privately.
 
 ## Installation
 
@@ -29,7 +29,7 @@ npm install -g @veil-cash/sdk
 |-------|----------|---------------|
 | ETH | 18 | Native ETH (via WETH) |
 | USDC | 6 | `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` |
-| BTC | 8 | `0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf` (cbBTC) |
+| cbBTC | 8 | `0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf` |
 
 ## CLI Quick Start
 
@@ -46,20 +46,20 @@ veil register
 # 4. Check your setup
 veil status
 
-# 5. Deposit (ETH, USDC, or BTC)
+# 5. Deposit (ETH, USDC, or cbBTC)
 veil deposit ETH 0.1
 veil deposit USDC 100
-veil deposit BTC 0.001
+veil deposit CBBTC 0.001
 
 # 6. Check your balance
 veil balance                  # ETH pool (default)
 veil balance --pool usdc      # USDC pool
-veil balance --pool btc       # BTC pool
+veil balance --pool cbbtc       # cbBTC pool
 
 # 7. Withdraw to any address
 veil withdraw ETH 0.05 0xRecipientAddress
 veil withdraw USDC 50 0xRecipientAddress
-veil withdraw BTC 0.0005 0xRecipientAddress
+veil withdraw CBBTC 0.0005 0xRecipientAddress
 
 # 8. Transfer privately to another registered user
 veil transfer ETH 0.02 0xRecipientAddress
@@ -144,12 +144,12 @@ If already registered with the same key, the command exits successfully. If regi
 
 ### `veil deposit <asset> <amount>`
 
-Deposit ETH, USDC, or BTC into the privacy pool. For USDC and BTC, the CLI automatically handles ERC20 approval before depositing.
+Deposit ETH, USDC, or cbBTC into the privacy pool. For USDC and cbBTC, the CLI automatically handles ERC20 approval before depositing.
 
 ```bash
 veil deposit ETH 0.1                    # Deposit ETH
 veil deposit USDC 100                   # Approve + deposit USDC
-veil deposit BTC 0.001                  # Approve + deposit BTC (cbBTC)
+veil deposit CBBTC 0.001                  # Approve + deposit cbBTC
 veil deposit ETH 0.1 --unsigned         # Unsigned payload for agents
 veil deposit ETH 0.1 --quiet            # Suppress progress output
 ```
@@ -173,7 +173,7 @@ Show both queue and private balances.
 ```bash
 veil balance                        # ETH pool (default)
 veil balance --pool usdc            # USDC pool
-veil balance --pool btc             # BTC pool
+veil balance --pool cbbtc             # cbBTC pool
 veil balance --quiet                # Suppress progress output
 ```
 
@@ -213,7 +213,7 @@ Withdraw from the privacy pool to any public address.
 ```bash
 veil withdraw ETH 0.05 0xRecipientAddress
 veil withdraw USDC 50 0xRecipientAddress
-veil withdraw BTC 0.0005 0xRecipientAddress
+veil withdraw CBBTC 0.0005 0xRecipientAddress
 veil withdraw ETH 0.05 0xRecipientAddress --quiet
 ```
 
@@ -236,7 +236,7 @@ Transfer privately to another registered Veil user.
 ```bash
 veil transfer ETH 0.02 0xRecipientAddress
 veil transfer USDC 25 0xRecipientAddress
-veil transfer BTC 0.0002 0xRecipientAddress
+veil transfer CBBTC 0.0002 0xRecipientAddress
 veil transfer ETH 0.02 0xRecipientAddress --quiet
 ```
 
@@ -260,7 +260,7 @@ Consolidate multiple small UTXOs into one (self-transfer).
 ```bash
 veil merge ETH 0.1                      # Merge ETH UTXOs totaling 0.1 ETH
 veil merge USDC 100                     # Merge USDC UTXOs
-veil merge BTC 0.001                    # Merge BTC UTXOs
+veil merge CBBTC 0.001                    # Merge cbBTC UTXOs
 veil merge ETH 0.1 --quiet
 ```
 
@@ -369,7 +369,7 @@ const usdcTx = buildDepositUSDCTx({
 });
 await client.sendTransaction(usdcTx);
 
-// 4c. Deposit BTC (approve first)
+// 4c. Deposit cbBTC (approve first)
 const approveBtcTx = buildApproveBTCTx({ amount: '0.001' });
 await client.sendTransaction(approveBtcTx);
 const btcTx = buildDepositBTCTx({
@@ -383,7 +383,7 @@ const withdrawResult = await withdraw({
   amount: '0.05',
   recipient: '0xRecipientAddress',
   keypair,
-  pool: 'eth', // 'eth' | 'usdc' | 'btc' (default: 'eth')
+  pool: 'eth', // 'eth' | 'usdc' | 'cbbtc' (default: 'eth')
 });
 
 // 6. Transfer privately
@@ -391,7 +391,7 @@ const transferResult = await transfer({
   amount: '0.02',
   recipientAddress: '0xRecipientAddress',
   senderKeypair: keypair,
-  pool: 'eth', // 'eth' | 'usdc' | 'btc' (default: 'eth')
+  pool: 'eth', // 'eth' | 'usdc' | 'cbbtc' (default: 'eth')
 });
 ```
 
@@ -459,7 +459,7 @@ const depositUsdcTx = buildDepositUSDCTx({
   amount: '100',
 });
 
-// Deposit BTC (approve + deposit)
+// Deposit cbBTC (approve + deposit)
 const approveBtcTx = buildApproveBTCTx({ amount: '0.001' });
 const depositBtcTx = buildDepositBTCTx({
   depositKey: keypair.depositKey(),
@@ -470,13 +470,13 @@ const depositBtcTx = buildDepositBTCTx({
 const tx = buildDepositTx({
   depositKey: keypair.depositKey(),
   amount: '0.1',
-  token: 'ETH', // 'ETH' | 'USDC' | 'BTC'
+  token: 'ETH', // 'ETH' | 'USDC' | 'CBBTC'
 });
 ```
 
 ### Withdraw & Transfer
 
-All withdraw, transfer, and merge functions accept an optional `pool` parameter (`'eth'` | `'usdc'` | `'btc'`), defaulting to `'eth'`.
+All withdraw, transfer, and merge functions accept an optional `pool` parameter (`'eth'` | `'usdc'` | `'cbbtc'`), defaulting to `'eth'`.
 
 ```typescript
 import { withdraw, transfer, mergeUtxos } from '@veil-cash/sdk';
@@ -498,12 +498,12 @@ const withdrawUsdc = await withdraw({
   pool: 'usdc',
 });
 
-// Transfer BTC to another registered user
+// Transfer cbBTC to another registered user
 const transferResult = await transfer({
   amount: '0.0002',
   recipientAddress: '0xRecipientAddress',
   senderKeypair: keypair,
-  pool: 'btc',
+  pool: 'cbbtc',
 });
 
 // Merge UTXOs (consolidate small balances)
@@ -516,7 +516,7 @@ const mergeResult = await mergeUtxos({
 
 ### Balance Queries
 
-Balance functions accept an optional `pool` parameter (`'eth'` | `'usdc'` | `'btc'`), defaulting to `'eth'`.
+Balance functions accept an optional `pool` parameter (`'eth'` | `'usdc'` | `'cbbtc'`), defaulting to `'eth'`.
 
 ```typescript
 import { getQueueBalance, getPrivateBalance } from '@veil-cash/sdk';
@@ -533,10 +533,10 @@ const privateBalance = await getPrivateBalance({
   pool: 'usdc',
 });
 
-// Check BTC private balance
+// Check cbBTC private balance
 const btcBalance = await getPrivateBalance({
   keypair,
-  pool: 'btc',
+  pool: 'cbbtc',
 });
 ```
 
@@ -549,13 +549,13 @@ const addresses = getAddresses();
 console.log(addresses.entry);     // Entry contract
 console.log(addresses.ethPool);   // ETH pool
 console.log(addresses.usdcPool);  // USDC pool
-console.log(addresses.btcPool);   // BTC pool
+console.log(addresses.cbbtcPool);   // cbBTC pool
 
 // Helper functions to resolve by pool name
 console.log(getPoolAddress('eth'));   // ETH pool address
 console.log(getPoolAddress('usdc')); // USDC pool address
-console.log(getPoolAddress('btc'));  // BTC pool address
-console.log(getQueueAddress('btc')); // BTC queue address
+console.log(getPoolAddress('cbbtc'));  // cbBTC pool address
+console.log(getQueueAddress('cbbtc')); // cbBTC queue address
 ```
 
 ## For AI Agents
@@ -574,7 +574,7 @@ veil init --json
 veil register --unsigned --address 0x...
 veil deposit ETH 0.1 --unsigned
 veil deposit USDC 100 --unsigned    # Outputs approve + deposit payloads
-veil deposit BTC 0.001 --unsigned
+veil deposit CBBTC 0.001 --unsigned
 
 # Suppress progress output for clean JSON
 veil balance --quiet
@@ -650,7 +650,7 @@ const result = await withdraw({
   amount: '0.05',
   recipient: '0xRecipient',
   keypair,
-  pool: 'eth', // 'eth' | 'usdc' | 'btc'
+  pool: 'eth', // 'eth' | 'usdc' | 'cbbtc'
 });
 // → { success, transactionHash, blockNumber }
 ```
@@ -660,7 +660,7 @@ const result = await withdraw({
 1. **Generate Keypair**: Run `veil init` to create and save your Veil keypair
 2. **Register**: Run `veil register` to link your deposit key on-chain (one-time)
 3. **Check Status**: Run `veil status` to verify your setup
-4. **Deposit**: Run `veil deposit <asset> <amount>` (e.g., `veil deposit ETH 0.1`, `veil deposit USDC 100`, `veil deposit BTC 0.001`)
+4. **Deposit**: Run `veil deposit <asset> <amount>` (e.g., `veil deposit ETH 0.1`, `veil deposit USDC 100`, `veil deposit CBBTC 0.001`)
 5. **Wait**: The Veil deposit engine processes your deposit
 6. **Done**: Your deposit is accepted into the privacy pool
 

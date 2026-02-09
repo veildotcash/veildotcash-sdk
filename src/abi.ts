@@ -101,7 +101,7 @@ export const ENTRY_ABI = [
     type: 'function',
   },
 
-  // Queue BTC deposit
+  // Queue cbBTC deposit
   {
     inputs: [
       { name: '_amount', type: 'uint256' },

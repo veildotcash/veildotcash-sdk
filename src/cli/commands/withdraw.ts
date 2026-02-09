@@ -8,7 +8,7 @@ import { withdraw } from '../../withdraw.js';
 import { handleCLIError, CLIError, ErrorCode } from '../errors.js';
 import type { RelayPool } from '../../types.js';
 
-const SUPPORTED_ASSETS = ['ETH', 'USDC', 'BTC'];
+const SUPPORTED_ASSETS = ['ETH', 'USDC', 'CBBTC'];
 
 // Progress helper - writes to stderr so JSON output stays clean
 function progress(msg: string, quiet?: boolean) {
@@ -20,7 +20,7 @@ function progress(msg: string, quiet?: boolean) {
 export function createWithdrawCommand(): Command {
   const withdrawCmd = new Command('withdraw')
     .description('Withdraw from private pool to a public address')
-    .argument('<asset>', 'Asset to withdraw (ETH, USDC, or BTC)')
+    .argument('<asset>', 'Asset to withdraw (ETH, USDC, or CBBTC)')
     .argument('<amount>', 'Amount to withdraw (e.g., 0.1)')
     .argument('<recipient>', 'Recipient address (e.g., 0x...)')
     .option('--veil-key <key>', 'Veil private key (or set VEIL_KEY env)')

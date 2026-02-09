@@ -3,7 +3,7 @@
  */
 
 import { Command } from 'commander';
-import { buildDepositETHTx, buildDepositUSDCTx, buildApproveUSDCTx, buildDepositBTCTx, buildApproveBTCTx } from '../../deposit.js';
+import { buildDepositETHTx, buildDepositUSDCTx, buildApproveUSDCTx, buildDepositCBBTCTx, buildApproveCBBTCTx } from '../../deposit.js';
 import { sendTransaction, getAddress, getBalance } from '../wallet.js';
 import { getConfig } from '../config.js';
 import { parseEther, formatEther } from 'viem';
@@ -15,7 +15,7 @@ const DEPOSIT_FEE_PERCENT = 0.3;
 const MINIMUM_DEPOSITS: Record<string, number> = {
   ETH: 0.01,
   USDC: 10,
-  BTC: 0.0001,
+  CBBTC: 0.0001,
 };
 
 function getMinimumWithFee(asset: string): number {
@@ -23,7 +23,7 @@ function getMinimumWithFee(asset: string): number {
   return min / (1 - DEPOSIT_FEE_PERCENT / 100);
 }
 
-const SUPPORTED_ASSETS = ['ETH', 'USDC', 'BTC'];
+const SUPPORTED_ASSETS = ['ETH', 'USDC', 'CBBTC'];
 
 // Progress helper - writes to stderr so JSON output stays clean
 function progress(msg: string, quiet?: boolean) {
@@ -34,8 +34,8 @@ function progress(msg: string, quiet?: boolean) {
 
 export function createDepositCommand(): Command {
   const deposit = new Command('deposit')
-    .description('Deposit ETH, USDC, or BTC into Veil')
-    .argument('<asset>', 'Asset to deposit (ETH, USDC, or BTC)')
+    .description('Deposit ETH, USDC, or cbBTC into Veil')
+    .argument('<asset>', 'Asset to deposit (ETH, USDC, or CBBTC)')
     .argument('<amount>', 'Amount to deposit (e.g., 0.1)')
     .option('--deposit-key <key>', 'Your Veil deposit key (or set DEPOSIT_KEY env)')
     .option('--wallet-key <key>', 'Ethereum wallet key for signing (or set WALLET_KEY env)')
@@ -79,9 +79,9 @@ export function createDepositCommand(): Command {
         if (assetUpper === 'USDC') {
           approveTx = buildApproveUSDCTx({ amount });
           tx = buildDepositUSDCTx({ depositKey, amount });
-        } else if (assetUpper === 'BTC') {
-          approveTx = buildApproveBTCTx({ amount });
-          tx = buildDepositBTCTx({ depositKey, amount });
+        } else if (assetUpper === 'CBBTC') {
+          approveTx = buildApproveCBBTCTx({ amount });
+          tx = buildDepositCBBTCTx({ depositKey, amount });
         } else {
           tx = buildDepositETHTx({ depositKey, amount });
         }

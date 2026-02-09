@@ -11,6 +11,9 @@
 - CLI: remove `--out` flag from `veil init` (always saves to `.env.veil`)
 - Add `buildChangeDepositKeyTx()` for updating an existing deposit key on-chain
 - CLI: `veil register --force` now changes the deposit key if already registered with a different key
+- **Breaking**: Rename `btc`/`BTC` pool to `cbbtc`/`CBBTC` across the entire package (types, addresses, CLI commands, functions)
+- Rename `buildDepositBTCTx` -> `buildDepositCBBTCTx`, `buildApproveBTCTx` -> `buildApproveCBBTCTx`
+- Rename address keys: `btcPool`/`btcQueue`/`btcToken` -> `cbbtcPool`/`cbbtcQueue`/`cbbtcToken`
 
 ## 0.2.0
 

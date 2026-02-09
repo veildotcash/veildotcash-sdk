@@ -14,9 +14,9 @@ export const ADDRESSES: NetworkAddresses = {
   usdcPool: '0x5c50d58E49C59d112680c187De2Bf989d2a91242',
   usdcQueue: '0x5530241b24504bF05C9a22e95A1F5458888e6a9B',
   usdcToken: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
-  btcPool: '0x51A021da774b4bBB59B47f7CB4ccd631337680BA',
-  btcQueue: '0x977741CaDF8D1431c4816C0993D32b02094cD35C',
-  btcToken: '0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf',
+  cbbtcPool: '0x51A021da774b4bBB59B47f7CB4ccd631337680BA',
+  cbbtcQueue: '0x977741CaDF8D1431c4816C0993D32b02094cD35C',
+  cbbtcToken: '0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf',
   chainId: 8453,
   relayUrl: 'https://veil-relay.up.railway.app',
 } as const;
@@ -37,11 +37,11 @@ export const POOL_CONFIG = {
     symbol: 'USDC',
     name: 'USD Coin',
   },
-  btc: {
+  cbbtc: {
     decimals: 8,
     displayDecimals: 6,
-    symbol: 'BTC',
-    name: 'Bitcoin',
+    symbol: 'cbBTC',
+    name: 'Coinbase Bitcoin',
   },
 } as const;
 
@@ -55,7 +55,7 @@ export function getAddresses(): NetworkAddresses {
 
 /**
  * Get the pool contract address for a given pool
- * @param pool - Pool identifier ('eth', 'usdc', or 'btc')
+ * @param pool - Pool identifier ('eth', 'usdc', or 'cbbtc')
  * @returns Pool contract address
  */
 export function getPoolAddress(pool: RelayPool): `0x${string}` {
@@ -63,14 +63,14 @@ export function getPoolAddress(pool: RelayPool): `0x${string}` {
   switch (pool) {
     case 'eth': return addresses.ethPool;
     case 'usdc': return addresses.usdcPool;
-    case 'btc': return addresses.btcPool;
+    case 'cbbtc': return addresses.cbbtcPool;
     default: throw new Error(`Unknown pool: ${pool}`);
   }
 }
 
 /**
  * Get the queue contract address for a given pool
- * @param pool - Pool identifier ('eth', 'usdc', or 'btc')
+ * @param pool - Pool identifier ('eth', 'usdc', or 'cbbtc')
  * @returns Queue contract address
  */
 export function getQueueAddress(pool: RelayPool): `0x${string}` {
@@ -78,7 +78,7 @@ export function getQueueAddress(pool: RelayPool): `0x${string}` {
   switch (pool) {
     case 'eth': return addresses.ethQueue;
     case 'usdc': return addresses.usdcQueue;
-    case 'btc': return addresses.btcQueue;
+    case 'cbbtc': return addresses.cbbtcQueue;
     default: throw new Error(`Unknown pool: ${pool}`);
   }
 }
