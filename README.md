@@ -72,14 +72,19 @@ veil merge ETH 0.1
 
 ### `veil init`
 
-Generate a new Veil keypair.
+Generate or derive a Veil keypair.
 
 ```bash
-veil init              # Interactive, saves to .env.veil
-veil init --force      # Overwrite existing without prompting
-veil init --json       # Output as JSON (no prompts, no file save)
-veil init --out path   # Save to custom path
-veil init --no-save    # Print keypair without saving
+veil init                                  # Random keypair, saves to .env.veil
+veil init --force                          # Overwrite existing without prompting
+veil init --json                           # Output as JSON (no prompts, no file save)
+veil init --no-save                        # Print keypair without saving
+
+# Derive from wallet (same keypair as frontend login)
+veil init --sign-message --wallet-key 0x...
+
+# Derive from a pre-computed EIP-191 signature (from Bankr, MPC, etc.)
+veil init --signature 0x...
 ```
 
 ### `veil keypair`
@@ -123,13 +128,19 @@ Output:
 
 ### `veil register`
 
-Register your deposit key on-chain (one-time per address).
+Register or update your deposit key on-chain.
 
 ```bash
-veil register                              # Signs & sends
+veil register                              # Register (first time)
 veil register --json                       # JSON output
 veil register --unsigned --address 0x...   # Unsigned payload for agents
+
+# Change deposit key (if already registered with a different key)
+veil register --force                      # Change to local deposit key
+veil register --force --unsigned           # Unsigned change payload for agents
 ```
+
+If already registered with the same key, the command exits successfully. If registered with a different key (e.g. after `veil init --sign-message`), use `--force` to update it on-chain.
 
 ### `veil deposit <asset> <amount>`
 
@@ -389,13 +400,26 @@ const transferResult = await transfer({
 ### Keypair
 
 ```typescript
-import { Keypair } from '@veil-cash/sdk';
+import { Keypair, VEIL_SIGNED_MESSAGE } from '@veil-cash/sdk';
+import type { MessageSigner } from '@veil-cash/sdk';
 
-// Generate new keypair
+// Generate random keypair
 const keypair = new Keypair();
 
 // Restore from saved Veil private key
 const restored = new Keypair(savedVeilKey);
+
+// Derive from wallet key (same keypair as frontend login)
+const derived = await Keypair.fromWalletKey('0xYOUR_WALLET_KEY');
+
+// Derive from a raw EIP-191 signature
+const fromSig = Keypair.fromSignature('0xSIGNATURE...');
+
+// Derive from any external signer (Bankr, MPC, custodial, etc.)
+const fromSigner = await Keypair.fromSigner(async (message) => {
+  // Sign `message` using any personal_sign provider and return the signature
+  return await mySigningService.personalSign(message);
+});
 
 // Get deposit key (for registration)
 keypair.depositKey(); // '0x...' (130 hex chars)
@@ -408,13 +432,17 @@ keypair.privkey; // '0x...'
 
 ```typescript
 import {
-  buildRegisterTx, buildDepositETHTx, buildDepositTx,
+  buildRegisterTx, buildChangeDepositKeyTx, buildDepositETHTx, buildDepositTx,
   buildDepositUSDCTx, buildApproveUSDCTx,
   buildDepositBTCTx, buildApproveBTCTx,
 } from '@veil-cash/sdk';
 
-// Register deposit key (one-time)
+// Register deposit key (first time)
 const registerTx = buildRegisterTx(depositKey, ownerAddress);
+// → { to: '0x...', data: '0x...' }
+
+// Change deposit key (must already be registered)
+const changeTx = buildChangeDepositKeyTx(newDepositKey, ownerAddress);
 // → { to: '0x...', data: '0x...' }
 
 // Deposit ETH
@@ -555,6 +583,38 @@ veil withdraw ETH 0.05 0xRecipient --quiet
 ```
 
 ### Bankr Integration
+
+#### Keypair Derivation via Bankr Sign API
+
+Use `Keypair.fromSigner()` with Bankr's `POST /agent/sign` endpoint to derive the same keypair as the frontend:
+
+```typescript
+import { Keypair } from '@veil-cash/sdk';
+
+const keypair = await Keypair.fromSigner(async (message) => {
+  const res = await fetch('https://api.bankr.bot/agent/sign', {
+    method: 'POST',
+    headers: { 'X-API-Key': BANKR_API_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ signatureType: 'personal_sign', message }),
+  });
+  return (await res.json()).signature;
+});
+```
+
+Or via CLI (two-step):
+```bash
+# 1. Get signature from Bankr sign API
+SIG=$(curl -s -X POST "https://api.bankr.bot/agent/sign" \
+  -H "X-API-Key: $BANKR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d "{\"signatureType\":\"personal_sign\",\"message\":\"$(node -e "const{VEIL_SIGNED_MESSAGE}=require('@veil-cash/sdk');console.log(VEIL_SIGNED_MESSAGE)")\"}" \
+  | jq -r '.signature')
+
+# 2. Derive keypair from signature
+veil init --signature $SIG
+```
+
+#### Unsigned Transaction Payloads
 
 Use `--unsigned` to get Bankr-compatible transaction payloads:
 

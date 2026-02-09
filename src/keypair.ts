@@ -4,8 +4,21 @@
  */
 
 import { ethers } from 'ethers';
+import { privateKeyToAccount } from 'viem/accounts';
 import { poseidonHash, toFixedHex } from './utils.js';
 import type { EncryptedMessage } from './types.js';
+
+/**
+ * Canonical message signed by a wallet to derive a Veil keypair.
+ * Must match the frontend's SIGNED_MESSAGE in data/wallet/config.ts.
+ */
+export const VEIL_SIGNED_MESSAGE = "Sign this message to create your Veil Wallet private key. This will be used to decrypt your balances. Ensure you are signing this message on the Veil Cash website.";
+
+/**
+ * Any async function that performs EIP-191 personal_sign and returns a 0x-prefixed signature.
+ * Used with Keypair.fromSigner() to support external signing services.
+ */
+export type MessageSigner = (message: string) => Promise<string>;
 
 // eth-sig-util for x25519 encryption
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -123,6 +136,72 @@ export class Keypair {
       pubkey: BigInt('0x' + str.slice(0, 64)),
       encryptionKey: Buffer.from(str.slice(64, 128), 'hex').toString('base64'),
     });
+  }
+
+  /**
+   * Derive a Keypair from an EIP-191 personal_sign signature.
+   * The private key is keccak256(signature) -- matching the frontend derivation.
+   * 
+   * @param signature - Raw ECDSA signature (0x-prefixed, 132 hex chars)
+   * @returns Keypair derived from the signature
+   * 
+   * @example
+   * ```typescript
+   * const keypair = Keypair.fromSignature(signature);
+   * ```
+   */
+  static fromSignature(signature: string): Keypair {
+    const privkey = ethers.keccak256(signature);
+    return new Keypair(privkey);
+  }
+
+  /**
+   * Derive a Keypair from an Ethereum wallet private key.
+   * Signs VEIL_SIGNED_MESSAGE with the wallet, then derives via keccak256(signature).
+   * Produces the same keypair as the frontend for the same wallet.
+   * 
+   * @param walletPrivateKey - Ethereum EOA private key (0x-prefixed)
+   * @returns Promise resolving to the derived Keypair
+   * 
+   * @example
+   * ```typescript
+   * const keypair = await Keypair.fromWalletKey('0xYOUR_WALLET_PRIVATE_KEY');
+   * console.log(keypair.depositKey()); // Same as frontend login with this wallet
+   * ```
+   */
+  static async fromWalletKey(walletPrivateKey: `0x${string}`): Promise<Keypair> {
+    const account = privateKeyToAccount(walletPrivateKey);
+    const signature = await account.signMessage({ message: VEIL_SIGNED_MESSAGE });
+    return Keypair.fromSignature(signature);
+  }
+
+  /**
+   * Derive a Keypair using any external signer that supports personal_sign (EIP-191).
+   * The signer function receives VEIL_SIGNED_MESSAGE and must return a 0x-prefixed signature.
+   * Works with any signing backend: Bankr, MPC wallets, custodial services, hardware wallets, etc.
+   * 
+   * @param signer - Async function that signs a message and returns a 0x-prefixed signature
+   * @returns Promise resolving to the derived Keypair
+   * 
+   * @example
+   * ```typescript
+   * // With Bankr
+   * const keypair = await Keypair.fromSigner(async (message) => {
+   *   const res = await fetch('https://api.bankr.bot/agent/sign', {
+   *     method: 'POST',
+   *     headers: { 'X-API-Key': apiKey, 'Content-Type': 'application/json' },
+   *     body: JSON.stringify({ signatureType: 'personal_sign', message }),
+   *   });
+   *   return (await res.json()).signature;
+   * });
+   * 
+   * // With any custom signer
+   * const keypair = await Keypair.fromSigner(async (msg) => myService.personalSign(msg));
+   * ```
+   */
+  static async fromSigner(signer: MessageSigner): Promise<Keypair> {
+    const signature = await signer(VEIL_SIGNED_MESSAGE);
+    return Keypair.fromSignature(signature);
   }
 
   /**

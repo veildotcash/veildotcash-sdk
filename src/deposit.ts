@@ -48,6 +48,42 @@ export function buildRegisterTx(
 }
 
 /**
+ * Build a transaction to change an existing deposit key
+ * The caller must already be registered on-chain
+ * 
+ * @param depositKey - New deposit key from Keypair.depositKey()
+ * @param ownerAddress - Address that owns the current deposit key (must be msg.sender)
+ * @returns Transaction data to send
+ * 
+ * @example
+ * ```typescript
+ * const newKeypair = await Keypair.fromWalletKey('0x...');
+ * const tx = buildChangeDepositKeyTx(newKeypair.depositKey(), '0x...');
+ * // Send tx using your wallet
+ * ```
+ */
+export function buildChangeDepositKeyTx(
+  depositKey: string,
+  ownerAddress: `0x${string}`
+): TransactionData {
+  const addresses = getAddresses();
+  
+  const data = encodeFunctionData({
+    abi: ENTRY_ABI,
+    functionName: 'changeDepositKey',
+    args: [{
+      owner: ownerAddress,
+      depositKey: depositKey as `0x${string}`,
+    }],
+  });
+
+  return {
+    to: addresses.entry,
+    data,
+  };
+}
+
+/**
  * Build a transaction to deposit ETH
  * 
  * @param options - Deposit options

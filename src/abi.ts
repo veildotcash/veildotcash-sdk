@@ -62,6 +62,24 @@ export const ENTRY_ABI = [
     type: 'function',
   },
 
+  // Change deposit key (must already be registered)
+  {
+    inputs: [
+      {
+        components: [
+          { name: 'owner', type: 'address' },
+          { name: 'depositKey', type: 'bytes' },
+        ],
+        name: '_account',
+        type: 'tuple',
+      },
+    ],
+    name: 'changeDepositKey',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+
   // Queue ETH deposit
   {
     inputs: [{ name: '_depositKey', type: 'bytes' }],

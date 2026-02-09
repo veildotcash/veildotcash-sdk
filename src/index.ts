@@ -32,7 +32,8 @@
  */
 
 // Keypair
-export { Keypair, packEncryptedMessage, unpackEncryptedMessage } from './keypair.js';
+export { Keypair, packEncryptedMessage, unpackEncryptedMessage, VEIL_SIGNED_MESSAGE } from './keypair.js';
+export type { MessageSigner } from './keypair.js';
 
 // UTXO
 export { Utxo } from './utxo.js';
@@ -41,6 +42,7 @@ export type { UtxoParams } from './utxo.js';
 // Deposit functions
 export { 
   buildRegisterTx,
+  buildChangeDepositKeyTx,
   buildDepositETHTx,
   buildDepositUSDCTx,
   buildApproveUSDCTx,
