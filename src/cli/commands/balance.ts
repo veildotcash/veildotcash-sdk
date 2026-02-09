@@ -4,14 +4,91 @@
 
 import { Command } from 'commander';
 import { getQueueBalance, getPrivateBalance } from '../../balance.js';
+import { POOL_CONFIG } from '../../addresses.js';
 import { Keypair } from '../../keypair.js';
 import { getAddress } from '../wallet.js';
-import { formatEther } from 'viem';
+import { formatUnits } from 'viem';
 import { handleCLIError, CLIError, ErrorCode } from '../errors.js';
+import type { RelayPool } from '../../types.js';
+
+const SUPPORTED_POOLS: RelayPool[] = ['eth', 'usdc', 'cbbtc'];
+
+/**
+ * Fetch balance for a single pool and return structured output
+ */
+async function fetchPoolBalance(
+  pool: RelayPool,
+  address: `0x${string}`,
+  keypair: Keypair | null,
+  rpcUrl: string | undefined,
+  onProgress: ((stage: string, detail?: string) => void) | undefined,
+): Promise<Record<string, unknown>> {
+  const poolConfig = POOL_CONFIG[pool];
+
+  // Get queue balance
+  const poolProgress = onProgress
+    ? (stage: string, detail?: string) => onProgress(`[${pool.toUpperCase()}] ${stage}`, detail)
+    : undefined;
+
+  const queueResult = await getQueueBalance({ address, pool, rpcUrl, onProgress: poolProgress });
+
+  // Get private balance if keypair available
+  let privateResult = null;
+  if (keypair) {
+    privateResult = await getPrivateBalance({ keypair, pool, rpcUrl, onProgress: poolProgress });
+  }
+
+  // Calculate total balance
+  const queueBalanceWei = BigInt(queueResult.queueBalanceWei);
+  const privateBalanceWei = privateResult ? BigInt(privateResult.privateBalanceWei) : 0n;
+  const totalBalanceWei = queueBalanceWei + privateBalanceWei;
+
+  const result: Record<string, unknown> = {
+    pool: pool.toUpperCase(),
+    symbol: poolConfig.symbol,
+    totalBalance: formatUnits(totalBalanceWei, poolConfig.decimals),
+    totalBalanceWei: totalBalanceWei.toString(),
+  };
+
+  // Private balance
+  if (privateResult) {
+    const unspentUtxos = privateResult.utxos.filter(u => !u.isSpent);
+    result.private = {
+      balance: privateResult.privateBalance,
+      balanceWei: privateResult.privateBalanceWei,
+      utxoCount: privateResult.unspentCount,
+      utxos: unspentUtxos.map(u => ({
+        index: u.index,
+        amount: u.amount,
+      })),
+    };
+  } else {
+    result.private = {
+      balance: null,
+      note: 'Set VEIL_KEY to see private balance',
+    };
+  }
+
+  // Queue details
+  result.queue = {
+    balance: queueResult.queueBalance,
+    balanceWei: queueResult.queueBalanceWei,
+    count: queueResult.pendingCount,
+    deposits: queueResult.pendingDeposits.map(d => ({
+      nonce: d.nonce,
+      amount: d.amount,
+      status: d.status,
+      timestamp: d.timestamp,
+    })),
+  };
+
+  return result;
+}
 
 export function createBalanceCommand(): Command {
   const balance = new Command('balance')
-    .description('Show queue and private balances')
+    .description('Show queue and private balances (all pools by default)')
+    .option('--pool <pool>', 'Pool to check (eth, usdc, cbbtc, or all)', 'all')
     .option('--wallet-key <key>', 'Ethereum wallet key (or set WALLET_KEY env)')
     .option('--address <address>', 'Address to check (or derived from wallet key)')
     .option('--veil-key <key>', 'Veil private key (or set VEIL_KEY env)')
@@ -19,6 +96,15 @@ export function createBalanceCommand(): Command {
     .option('--quiet', 'Suppress progress output')
     .action(async (options) => {
       try {
+        const poolArg = (options.pool || 'all').toLowerCase();
+
+        // Validate pool
+        if (poolArg !== 'all' && !SUPPORTED_POOLS.includes(poolArg as RelayPool)) {
+          throw new CLIError(ErrorCode.INVALID_AMOUNT, `Unsupported pool: ${options.pool}. Supported: ${SUPPORTED_POOLS.join(', ')}, all`);
+        }
+
+        const poolsToQuery: RelayPool[] = poolArg === 'all' ? [...SUPPORTED_POOLS] : [poolArg as RelayPool];
+
         // Get address
         let address: `0x${string}`;
         if (options.address) {
@@ -45,66 +131,40 @@ export function createBalanceCommand(): Command {
               process.stderr.write(`\r\x1b[K${msg}`);
             };
 
-        // Get queue balance
-        const queueResult = await getQueueBalance({ address, rpcUrl, onProgress });
-
-        // Get private balance if keypair available
-        let privateResult = null;
-        if (keypair) {
-          privateResult = await getPrivateBalance({ keypair, rpcUrl, onProgress });
-        }
-
-        // Clear progress line
-        if (!options.quiet) {
-          process.stderr.write('\r\x1b[K');
-        }
-
-        // Calculate total balance
-        const queueBalanceWei = BigInt(queueResult.queueBalanceWei);
-        const privateBalanceWei = privateResult ? BigInt(privateResult.privateBalanceWei) : 0n;
-        const totalBalanceWei = queueBalanceWei + privateBalanceWei;
-
         // Get deposit key if available
         const depositKey = process.env.DEPOSIT_KEY || (keypair ? keypair.depositKey() : null);
 
-        // Build output structure
-        const output: Record<string, unknown> = {
-          address,
-          depositKey: depositKey || null,
-          totalBalance: formatEther(totalBalanceWei),
-          totalBalanceWei: totalBalanceWei.toString(),
-        };
+        // Single pool mode -- flat output (backwards compatible)
+        if (poolsToQuery.length === 1) {
+          const poolResult = await fetchPoolBalance(poolsToQuery[0], address, keypair, rpcUrl, onProgress);
 
-        // Private balance first
-        if (privateResult) {
-          const unspentUtxos = privateResult.utxos.filter(u => !u.isSpent);
-          output.private = {
-            balance: privateResult.privateBalance,
-            balanceWei: privateResult.privateBalanceWei,
-            utxoCount: privateResult.unspentCount,
-            utxos: unspentUtxos.map(u => ({
-              index: u.index,
-              amount: u.amount,
-            })),
+          // Clear progress line
+          if (!options.quiet) process.stderr.write('\r\x1b[K');
+
+          const output = {
+            address,
+            depositKey: depositKey || null,
+            ...poolResult,
           };
-        } else {
-          output.private = {
-            balance: null,
-            note: 'Set VEIL_KEY to see private balance',
-          };
+
+          console.log(JSON.stringify(output, null, 2));
+          return;
         }
 
-        // Queue details second
-        output.queue = {
-          balance: queueResult.queueBalance,
-          balanceWei: queueResult.queueBalanceWei,
-          count: queueResult.pendingCount,
-          deposits: queueResult.pendingDeposits.map(d => ({
-            nonce: d.nonce,
-            amount: d.amount,
-            status: d.status,
-            timestamp: d.timestamp,
-          })),
+        // All pools mode -- nested output
+        const pools: Record<string, unknown>[] = [];
+        for (const pool of poolsToQuery) {
+          const poolResult = await fetchPoolBalance(pool, address, keypair, rpcUrl, onProgress);
+          pools.push(poolResult);
+        }
+
+        // Clear progress line
+        if (!options.quiet) process.stderr.write('\r\x1b[K');
+
+        const output = {
+          address,
+          depositKey: depositKey || null,
+          pools,
         };
 
         console.log(JSON.stringify(output, null, 2));

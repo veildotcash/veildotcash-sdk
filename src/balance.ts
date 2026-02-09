@@ -3,9 +3,9 @@
  * Query queue and private balances directly from blockchain
  */
 
-import { createPublicClient, http, formatEther } from 'viem';
+import { createPublicClient, http, formatUnits } from 'viem';
 import { base } from 'viem/chains';
-import { getAddresses } from './addresses.js';
+import { getPoolAddress, getQueueAddress, POOL_CONFIG } from './addresses.js';
 import { QUEUE_ABI, POOL_ABI } from './abi.js';
 import { Keypair } from './keypair.js';
 import { Utxo } from './utxo.js';
@@ -15,6 +15,7 @@ import type {
   PendingDeposit, 
   PrivateBalanceResult,
   UtxoInfo,
+  RelayPool,
 } from './types.js';
 
 // Deposit status enum from Queue contract
@@ -44,6 +45,7 @@ export type ProgressCallback = (stage: string, detail?: string) => void;
  * ```typescript
  * const result = await getQueueBalance({
  *   address: '0x...',
+ *   pool: 'eth',
  *   onProgress: (stage, detail) => console.log(stage, detail),
  * });
  * 
@@ -53,11 +55,13 @@ export type ProgressCallback = (stage: string, detail?: string) => void;
  */
 export async function getQueueBalance(options: {
   address: `0x${string}`;
+  pool?: RelayPool;
   rpcUrl?: string;
   onProgress?: ProgressCallback;
 }): Promise<QueueBalanceResult> {
-  const { address, rpcUrl, onProgress } = options;
-  const addresses = getAddresses();
+  const { address, pool = 'eth', rpcUrl, onProgress } = options;
+  const queueAddress = getQueueAddress(pool);
+  const poolConfig = POOL_CONFIG[pool];
 
   // Create public client
   const publicClient = createPublicClient({
@@ -68,7 +72,7 @@ export async function getQueueBalance(options: {
   // Get all pending deposit nonces
   onProgress?.('Fetching pending deposits...');
   const pendingNonces = await publicClient.readContract({
-    address: addresses.ethQueue,
+    address: queueAddress,
     abi: QUEUE_ABI,
     functionName: 'getPendingDeposits',
   }) as bigint[];
@@ -83,7 +87,7 @@ export async function getQueueBalance(options: {
     onProgress?.('Checking deposit', `${i + 1}/${pendingNonces.length}`);
     
     const deposit = await publicClient.readContract({
-      address: addresses.ethQueue,
+      address: queueAddress,
       abi: QUEUE_ABI,
       functionName: 'getDeposit',
       args: [nonce],
@@ -103,7 +107,7 @@ export async function getQueueBalance(options: {
       pendingDeposits.push({
         nonce: nonce.toString(),
         status: DEPOSIT_STATUS_MAP[deposit.status as keyof typeof DEPOSIT_STATUS_MAP] || 'pending',
-        amount: formatEther(deposit.amountIn),
+        amount: formatUnits(deposit.amountIn, poolConfig.decimals),
         amountWei: deposit.amountIn.toString(),
         timestamp: new Date(Number(deposit.timestamp) * 1000).toISOString(),
       });
@@ -116,7 +120,7 @@ export async function getQueueBalance(options: {
 
   return {
     address,
-    queueBalance: formatEther(totalQueueBalance),
+    queueBalance: formatUnits(totalQueueBalance, poolConfig.decimals),
     queueBalanceWei: totalQueueBalance.toString(),
     pendingDeposits,
     pendingCount: pendingDeposits.length,
@@ -138,6 +142,7 @@ export async function getQueueBalance(options: {
  * const keypair = new Keypair(process.env.VEIL_KEY);
  * const result = await getPrivateBalance({ 
  *   keypair,
+ *   pool: 'eth',
  *   onProgress: (stage, detail) => console.log(stage, detail),
  * });
  * 
@@ -147,11 +152,13 @@ export async function getQueueBalance(options: {
  */
 export async function getPrivateBalance(options: {
   keypair: Keypair;
+  pool?: RelayPool;
   rpcUrl?: string;
   onProgress?: ProgressCallback;
 }): Promise<PrivateBalanceResult> {
-  const { keypair, rpcUrl, onProgress } = options;
-  const addresses = getAddresses();
+  const { keypair, pool = 'eth', rpcUrl, onProgress } = options;
+  const poolAddress = getPoolAddress(pool);
+  const poolConfig = POOL_CONFIG[pool];
 
   if (!keypair.privkey) {
     throw new Error('Keypair must have a private key to calculate private balance');
@@ -166,7 +173,7 @@ export async function getPrivateBalance(options: {
   // 1. Get total count of encrypted outputs
   onProgress?.('Fetching pool index...');
   const nextIndex = await publicClient.readContract({
-    address: addresses.ethPool,
+    address: poolAddress,
     abi: POOL_ABI,
     functionName: 'nextIndex',
   }) as number;
@@ -194,7 +201,7 @@ export async function getPrivateBalance(options: {
     onProgress?.('Fetching encrypted outputs', `batch ${batchNum}/${totalBatches} (${start}-${end})`);
     
     const batch = await publicClient.readContract({
-      address: addresses.ethPool,
+      address: poolAddress,
       abi: POOL_ABI,
       functionName: 'getEncryptedOutputs',
       args: [BigInt(start), BigInt(end)],
@@ -234,7 +241,7 @@ export async function getPrivateBalance(options: {
     const nullifierHex = toFixedHex(nullifier) as `0x${string}`;
 
     const isSpent = await publicClient.readContract({
-      address: addresses.ethPool,
+      address: poolAddress,
       abi: POOL_ABI,
       functionName: 'isSpent',
       args: [nullifierHex],
@@ -242,7 +249,7 @@ export async function getPrivateBalance(options: {
 
     utxoInfos.push({
       index,
-      amount: formatEther(utxo.amount),
+      amount: formatUnits(utxo.amount, poolConfig.decimals),
       amountWei: utxo.amount.toString(),
       isSpent,
     });
@@ -256,7 +263,7 @@ export async function getPrivateBalance(options: {
   }
 
   return {
-    privateBalance: formatEther(totalBalance),
+    privateBalance: formatUnits(totalBalance, poolConfig.decimals),
     privateBalanceWei: totalBalance.toString(),
     utxoCount: decryptedUtxos.length,
     spentCount,

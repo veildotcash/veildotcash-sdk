@@ -98,8 +98,8 @@ export async function submitRelay(options: SubmitRelayOptions): Promise<RelayRes
     throw new RelayError('Invalid type. Must be "withdraw" or "transfer"', 400);
   }
 
-  if (pool !== 'eth' && pool !== 'usdc') {
-    throw new RelayError('Invalid pool. Must be "eth" or "usdc"', 400);
+  if (pool !== 'eth' && pool !== 'usdc' && pool !== 'cbbtc') {
+    throw new RelayError('Invalid pool. Must be "eth", "usdc", or "cbbtc"', 400);
   }
 
   if (!proofArgs || !extData) {

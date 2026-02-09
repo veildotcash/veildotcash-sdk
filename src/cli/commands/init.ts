@@ -82,19 +82,56 @@ function saveVeilKeypair(veilKey: string, depositKey: string, envPath: string): 
   writeFileSync(envPath, content);
 }
 
+/**
+ * Resolve wallet key from CLI flag or WALLET_KEY env var
+ */
+function resolveWalletKey(options: { walletKey?: string }): `0x${string}` {
+  const raw = options.walletKey || process.env.WALLET_KEY;
+  if (!raw) {
+    throw new Error('Wallet key required for --sign-message. Use --wallet-key <key> or set WALLET_KEY env var.');
+  }
+  const key = raw.startsWith('0x') ? raw : `0x${raw}`;
+  if (key.length !== 66) {
+    throw new Error('Invalid wallet key format. Must be a 0x-prefixed 64-character hex string.');
+  }
+  return key as `0x${string}`;
+}
+
 export function createInitCommand(): Command {
   const init = new Command('init')
     .description('Generate a new Veil keypair')
     .option('--force', 'Overwrite existing keypair without prompting')
     .option('--json', 'Output as JSON (no prompts, no file save)')
-    .option('--out <path>', 'Save to custom path instead of .env.veil')
     .option('--no-save', 'Print keypair without saving to file')
+    .option('--sign-message', 'Derive keypair from wallet signature (same as frontend login)')
+    .option('--wallet-key <key>', 'Ethereum wallet private key (or set WALLET_KEY env var)')
+    .option('--signature <sig>', 'Derive keypair from a pre-computed EIP-191 personal_sign signature')
     .action(async (options) => {
-      const envPath = options.out || getDefaultEnvPath();
+      const envPath = getDefaultEnvPath();
       
+      /**
+       * Create keypair: derived from wallet, from signature, or random
+       */
+      async function createKp(): Promise<Keypair> {
+        if (options.signMessage) {
+          const walletKey = resolveWalletKey(options);
+          return Keypair.fromWalletKey(walletKey);
+        }
+        if (options.signature) {
+          return Keypair.fromSignature(options.signature);
+        }
+        return new Keypair();
+      }
+
+      const derivationLabel = options.signMessage
+        ? 'Derived Veil keypair from wallet signature'
+        : options.signature
+          ? 'Derived Veil keypair from provided signature'
+          : 'Generated new Veil keypair';
+
       // JSON mode: no prompts, no save, just output JSON
       if (options.json) {
-        const kp = new Keypair();
+        const kp = await createKp();
         console.log(JSON.stringify({
           veilKey: kp.privkey,
           depositKey: kp.depositKey(),
@@ -105,13 +142,13 @@ export function createInitCommand(): Command {
 
       // No-save mode: print but don't save
       if (!options.save) {
-        const kp = new Keypair();
-        console.log('\nGenerated new Veil keypair:\n');
+        const kp = await createKp();
+        console.log(`\n${derivationLabel}:\n`);
         console.log('Veil Private Key:');
         console.log(`  ${kp.privkey}\n`);
         console.log('Deposit Key (register this on-chain):');
         console.log(`  ${kp.depositKey()}\n`);
-        console.log('(Not saved - use --out <path> to save to a file)');
+        console.log('(Not saved - run without --no-save to save to .env.veil)');
         process.exit(0);
         return;
       }
@@ -129,9 +166,9 @@ export function createInitCommand(): Command {
         }
       }
       
-      const kp = new Keypair();
+      const kp = await createKp();
       
-      console.log('\nGenerated new Veil keypair:\n');
+      console.log(`\n${derivationLabel}:\n`);
       console.log('Veil Private Key:');
       console.log(`  ${kp.privkey}\n`);
       console.log('Deposit Key (register this on-chain):');

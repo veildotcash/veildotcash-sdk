@@ -5,7 +5,7 @@
 
 import { createPublicClient, http, parseUnits } from 'viem';
 import { base } from 'viem/chains';
-import { getAddresses, POOL_CONFIG } from './addresses.js';
+import { getAddresses, getPoolAddress, POOL_CONFIG } from './addresses.js';
 import { POOL_ABI, ENTRY_ABI } from './abi.js';
 import { Keypair } from './keypair.js';
 import { Utxo } from './utxo.js';
@@ -17,6 +17,7 @@ import type {
   BuildTransferProofOptions, 
   ProofBuildResult, 
   TransferResult,
+  RelayPool,
 } from './types.js';
 
 /**
@@ -137,13 +138,13 @@ export async function buildTransferProof(
     amount,
     recipientAddress,
     senderKeypair,
+    pool = 'eth',
     rpcUrl,
     onProgress,
   } = options;
 
-  const addresses = getAddresses();
-  const poolConfig = POOL_CONFIG.eth;
-  const poolAddress = addresses.ethPool;
+  const poolConfig = POOL_CONFIG[pool];
+  const poolAddress = getPoolAddress(pool);
 
   // 1. Check recipient is registered and get their deposit key
   onProgress?.('Checking recipient registration...');
@@ -160,6 +161,7 @@ export async function buildTransferProof(
   onProgress?.('Fetching your UTXOs...');
   const balanceResult = await getPrivateBalance({
     keypair: senderKeypair,
+    pool,
     rpcUrl,
     onProgress,
   });
@@ -283,7 +285,7 @@ export async function buildTransferProof(
 export async function transfer(
   options: BuildTransferProofOptions
 ): Promise<TransferResult> {
-  const { amount, recipientAddress, onProgress } = options;
+  const { amount, recipientAddress, pool = 'eth', onProgress } = options;
 
   // Build the proof
   const proof = await buildTransferProof(options);
@@ -292,7 +294,7 @@ export async function transfer(
   onProgress?.('Submitting to relay...');
   const relayResult = await submitRelay({
     type: 'transfer',
-    pool: 'eth',
+    pool,
     proofArgs: proof.proofArgs,
     extData: proof.extData,
     metadata: {
@@ -334,19 +336,20 @@ export async function transfer(
 export async function mergeUtxos(options: {
   amount: string;
   keypair: Keypair;
+  pool?: RelayPool;
   rpcUrl?: string;
   onProgress?: (stage: string, detail?: string) => void;
 }): Promise<TransferResult> {
-  const { amount, keypair, rpcUrl, onProgress } = options;
+  const { amount, keypair, pool = 'eth', rpcUrl, onProgress } = options;
 
-  const addresses = getAddresses();
-  const poolConfig = POOL_CONFIG.eth;
-  const poolAddress = addresses.ethPool;
+  const poolConfig = POOL_CONFIG[pool];
+  const poolAddress = getPoolAddress(pool);
 
   // 1. Get sender's unspent UTXOs
   onProgress?.('Fetching your UTXOs...');
   const balanceResult = await getPrivateBalance({
     keypair,
+    pool,
     rpcUrl,
     onProgress,
   });
@@ -435,7 +438,7 @@ export async function mergeUtxos(options: {
   onProgress?.('Submitting to relay...');
   const relayResult = await submitRelay({
     type: 'transfer',
-    pool: 'eth',
+    pool,
     proofArgs: {
       proof: result.args.proof,
       root: result.args.root,

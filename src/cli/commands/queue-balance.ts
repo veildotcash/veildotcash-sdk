@@ -5,16 +5,20 @@
 import { Command } from 'commander';
 import { getQueueBalance } from '../../balance.js';
 import { getAddress } from '../wallet.js';
+import type { RelayPool } from '../../types.js';
 
 export function createQueueBalanceCommand(): Command {
   const balance = new Command('queue-balance')
     .description('Show queue balance and pending deposits')
+    .option('--pool <pool>', 'Pool to check (eth, usdc, or cbbtc)', 'eth')
     .option('--wallet-key <key>', 'Ethereum wallet key (or set WALLET_KEY env)')
     .option('--address <address>', 'Address to check (or derived from wallet key)')
     .option('--rpc-url <url>', 'RPC URL (or set RPC_URL env)')
     .option('--quiet', 'Suppress progress output')
     .action(async (options) => {
       try {
+        const pool = (options.pool || 'eth').toLowerCase() as RelayPool;
+
         // Get address
         let address: `0x${string}`;
         if (options.address) {
@@ -37,7 +41,7 @@ export function createQueueBalanceCommand(): Command {
 
         // Get queue balance from SDK
         const rpcUrl = options.rpcUrl || process.env.RPC_URL;
-        const result = await getQueueBalance({ address, rpcUrl, onProgress });
+        const result = await getQueueBalance({ address, pool, rpcUrl, onProgress });
 
         // Clear progress line
         if (!options.quiet) {

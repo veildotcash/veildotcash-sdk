@@ -48,6 +48,42 @@ export function buildRegisterTx(
 }
 
 /**
+ * Build a transaction to change an existing deposit key
+ * The caller must already be registered on-chain
+ * 
+ * @param depositKey - New deposit key from Keypair.depositKey()
+ * @param ownerAddress - Address that owns the current deposit key (must be msg.sender)
+ * @returns Transaction data to send
+ * 
+ * @example
+ * ```typescript
+ * const newKeypair = await Keypair.fromWalletKey('0x...');
+ * const tx = buildChangeDepositKeyTx(newKeypair.depositKey(), '0x...');
+ * // Send tx using your wallet
+ * ```
+ */
+export function buildChangeDepositKeyTx(
+  depositKey: string,
+  ownerAddress: `0x${string}`
+): TransactionData {
+  const addresses = getAddresses();
+  
+  const data = encodeFunctionData({
+    abi: ENTRY_ABI,
+    functionName: 'changeDepositKey',
+    args: [{
+      owner: ownerAddress,
+      depositKey: depositKey as `0x${string}`,
+    }],
+  });
+
+  return {
+    to: addresses.entry,
+    data,
+  };
+}
+
+/**
  * Build a transaction to deposit ETH
  * 
  * @param options - Deposit options
@@ -145,7 +181,65 @@ export function buildDepositUSDCTx(options: {
 }
 
 /**
- * Build a deposit transaction (ETH or USDC)
+ * Build a transaction to approve cbBTC for deposit
+ * Must be called before depositCBBTC if allowance is insufficient
+ * 
+ * @param options - Approval options
+ * @param options.amount - Amount to approve (human readable, e.g., '0.5')
+ * @returns Transaction data
+ */
+export function buildApproveCBBTCTx(options: {
+  amount: string;
+}): TransactionData {
+  const { amount } = options;
+  const addresses = getAddresses();
+  
+  const amountWei = parseUnits(amount, POOL_CONFIG.cbbtc.decimals);
+  
+  const data = encodeFunctionData({
+    abi: ERC20_ABI,
+    functionName: 'approve',
+    args: [addresses.entry, amountWei],
+  });
+
+  return {
+    to: addresses.cbbtcToken,
+    data,
+  };
+}
+
+/**
+ * Build a transaction to deposit cbBTC
+ * Note: You must approve cbBTC first using buildApproveCBBTCTx
+ * 
+ * @param options - Deposit options
+ * @param options.depositKey - Deposit key from Keypair.depositKey()
+ * @param options.amount - Amount to deposit (human readable, e.g., '0.5')
+ * @returns Transaction data
+ */
+export function buildDepositCBBTCTx(options: {
+  depositKey: string;
+  amount: string;
+}): TransactionData {
+  const { depositKey, amount } = options;
+  const addresses = getAddresses();
+  
+  const amountWei = parseUnits(amount, POOL_CONFIG.cbbtc.decimals);
+  
+  const data = encodeFunctionData({
+    abi: ENTRY_ABI,
+    functionName: 'queueBTC',
+    args: [amountWei, depositKey as `0x${string}`],
+  });
+
+  return {
+    to: addresses.entry,
+    data,
+  };
+}
+
+/**
+ * Build a deposit transaction (ETH, USDC, or cbBTC)
  * Convenience function that routes to the correct builder
  * 
  * @param options - Deposit options
@@ -166,6 +260,13 @@ export function buildDepositUSDCTx(options: {
  *   amount: '100',
  *   token: 'USDC',
  * });
+ * 
+ * // cbBTC deposit (remember to approve first!)
+ * const cbbtcTx = buildDepositTx({
+ *   depositKey: keypair.depositKey(),
+ *   amount: '0.5',
+ *   token: 'CBBTC',
+ * });
  * ```
  */
 export function buildDepositTx(options: {
@@ -177,6 +278,10 @@ export function buildDepositTx(options: {
   
   if (token === 'USDC') {
     return buildDepositUSDCTx(rest);
+  }
+
+  if (token === 'CBBTC') {
+    return buildDepositCBBTCTx(rest);
   }
   
   return buildDepositETHTx(rest);

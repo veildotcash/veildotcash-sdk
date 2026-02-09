@@ -1,6 +1,6 @@
 {
   "name": "@veil-cash/sdk",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "SDK and CLI for interacting with Veil Cash privacy pools - keypair generation, deposits, and status checking",
   "type": "module",
   "main": "./dist/index.js",
