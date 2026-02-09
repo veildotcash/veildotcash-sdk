@@ -329,7 +329,7 @@ All CLI commands output JSON with standardized error codes:
 import {
   Keypair, buildRegisterTx, buildDepositETHTx,
   buildDepositUSDCTx, buildApproveUSDCTx,
-  buildDepositBTCTx, buildApproveBTCTx,
+  buildDepositCBBTCTx, buildApproveCBBTCTx,
   withdraw, transfer,
 } from '@veil-cash/sdk';
 import { createWalletClient, http } from 'viem';
@@ -370,13 +370,13 @@ const usdcTx = buildDepositUSDCTx({
 await client.sendTransaction(usdcTx);
 
 // 4c. Deposit cbBTC (approve first)
-const approveBtcTx = buildApproveBTCTx({ amount: '0.001' });
-await client.sendTransaction(approveBtcTx);
-const btcTx = buildDepositBTCTx({
+const approveCbbtcTx = buildApproveCBBTCTx({ amount: '0.001' });
+await client.sendTransaction(approveCbbtcTx);
+const cbbtcTx = buildDepositCBBTCTx({
   depositKey: keypair.depositKey(),
   amount: '0.001',
 });
-await client.sendTransaction(btcTx);
+await client.sendTransaction(cbbtcTx);
 
 // 5. Withdraw (sent via relayer, no wallet signing needed)
 const withdrawResult = await withdraw({
@@ -434,7 +434,7 @@ keypair.privkey; // '0x...'
 import {
   buildRegisterTx, buildChangeDepositKeyTx, buildDepositETHTx, buildDepositTx,
   buildDepositUSDCTx, buildApproveUSDCTx,
-  buildDepositBTCTx, buildApproveBTCTx,
+  buildDepositCBBTCTx, buildApproveCBBTCTx,
 } from '@veil-cash/sdk';
 
 // Register deposit key (first time)
@@ -460,8 +460,8 @@ const depositUsdcTx = buildDepositUSDCTx({
 });
 
 // Deposit cbBTC (approve + deposit)
-const approveBtcTx = buildApproveBTCTx({ amount: '0.001' });
-const depositBtcTx = buildDepositBTCTx({
+const approveCbbtcTx = buildApproveCBBTCTx({ amount: '0.001' });
+const depositCbbtcTx = buildDepositCBBTCTx({
   depositKey: keypair.depositKey(),
   amount: '0.001',
 });
