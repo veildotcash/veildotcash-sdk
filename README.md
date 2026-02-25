@@ -50,8 +50,9 @@ veil deposit ETH 0.1
 veil deposit USDC 100
 
 # 6. Check your balance
-veil balance                  # ETH pool (default)
-veil balance --pool usdc      # USDC pool
+veil balance                  # All pools (default)
+veil balance --pool eth       # ETH pool only
+veil balance --pool usdc      # USDC pool only
 
 # 7. Withdraw to any address
 veil withdraw ETH 0.05 0xRecipientAddress
@@ -82,6 +83,18 @@ veil init --sign-message --wallet-key 0x...
 # Derive from a pre-computed EIP-191 signature (from Bankr, MPC, etc.)
 veil init --signature 0x...
 ```
+
+`--json` output:
+```json
+{
+  "veilKey": "0x...",
+  "veilPrivateKey": "0x...",
+  "depositKey": "0x...",
+  "derivation": "wallet-signature"
+}
+```
+
+`veilKey` and `veilPrivateKey` are the same value (the Veil private key). Both are included for backward compatibility -- `veil keypair` uses `veilPrivateKey`. The `derivation` field indicates how the keypair was created: `"wallet-signature"`, `"provided-signature"`, or `"random"`.
 
 ### `veil keypair`
 
@@ -166,8 +179,9 @@ Output:
 Show both queue and private balances.
 
 ```bash
-veil balance                        # ETH pool (default)
-veil balance --pool usdc            # USDC pool
+veil balance                        # All pools (default)
+veil balance --pool eth             # ETH pool only
+veil balance --pool usdc            # USDC pool only
 veil balance --quiet                # Suppress progress output
 ```
 
