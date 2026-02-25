@@ -10,7 +10,7 @@ import type { RelayPool } from '../../types.js';
 export function createQueueBalanceCommand(): Command {
   const balance = new Command('queue-balance')
     .description('Show queue balance and pending deposits')
-    .option('--pool <pool>', 'Pool to check (eth, usdc, or cbbtc)', 'eth')
+    .option('--pool <pool>', 'Pool to check (eth or usdc)', 'eth')
     .option('--wallet-key <key>', 'Ethereum wallet key (or set WALLET_KEY env)')
     .option('--address <address>', 'Address to check (or derived from wallet key)')
     .option('--rpc-url <url>', 'RPC URL (or set RPC_URL env)')
