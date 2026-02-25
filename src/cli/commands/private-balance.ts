@@ -10,7 +10,7 @@ import type { RelayPool } from '../../types.js';
 export function createPrivateBalanceCommand(): Command {
   const privateBalance = new Command('private-balance')
     .description('Show private balance (requires VEIL_KEY)')
-    .option('--pool <pool>', 'Pool to check (eth, usdc, or cbbtc)', 'eth')
+    .option('--pool <pool>', 'Pool to check (eth or usdc)', 'eth')
     .option('--veil-key <key>', 'Veil private key (or set VEIL_KEY env)')
     .option('--rpc-url <url>', 'RPC URL (or set RPC_URL env)')
     .option('--show-utxos', 'Show individual UTXO details')
