@@ -8,6 +8,8 @@
 - Remove `cbbtcPool`, `cbbtcQueue`, `cbbtcToken` from `ADDRESSES` and `NetworkAddresses`
 - Remove `cbbtc` entry from `POOL_CONFIG`
 - CLI commands (deposit, withdraw, transfer, merge, balance) no longer accept `CBBTC`/`cbbtc`
+- `veil init --json` now includes `veilPrivateKey` field (alias for `veilKey`) for consistency with `veil keypair` output
+- `veil init --json` now includes `derivation` field (`"wallet-signature"`, `"provided-signature"`, or `"random"`)
 
 ## 0.3.0
 

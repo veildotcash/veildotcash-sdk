@@ -123,6 +123,11 @@ export function createInitCommand(): Command {
         return new Keypair();
       }
 
+      const derivation: 'wallet-signature' | 'provided-signature' | 'random' =
+        options.signMessage ? 'wallet-signature'
+        : options.signature ? 'provided-signature'
+        : 'random';
+
       const derivationLabel = options.signMessage
         ? 'Derived Veil keypair from wallet signature'
         : options.signature
@@ -134,7 +139,9 @@ export function createInitCommand(): Command {
         const kp = await createKp();
         console.log(JSON.stringify({
           veilKey: kp.privkey,
+          veilPrivateKey: kp.privkey,
           depositKey: kp.depositKey(),
+          derivation,
         }, null, 2));
         process.exit(0);
         return;
