@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.0
+
+- **Breaking**: Remove deprecated cbBTC pool — `buildDepositCBBTCTx`, `buildApproveCBBTCTx`, and the `queueBTC` ABI entry have been removed
+- **Breaking**: `Token` type narrowed from `'ETH' | 'USDC' | 'CBBTC'` to `'ETH' | 'USDC'`
+- **Breaking**: `RelayPool` type narrowed from `'eth' | 'usdc' | 'cbbtc'` to `'eth' | 'usdc'`
+- Remove `cbbtcPool`, `cbbtcQueue`, `cbbtcToken` from `ADDRESSES` and `NetworkAddresses`
+- Remove `cbbtc` entry from `POOL_CONFIG`
+- CLI commands (deposit, withdraw, transfer, merge, balance) no longer accept `CBBTC`/`cbbtc`
+
 ## 0.3.0
 
 - Add `Keypair.fromWalletKey(walletKey)` -- derive Veil keypair from an Ethereum wallet key (same keypair as frontend login)

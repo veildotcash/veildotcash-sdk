@@ -5,7 +5,7 @@
 /**
  * Supported tokens
  */
-export type Token = 'ETH' | 'USDC' | 'CBBTC';
+export type Token = 'ETH' | 'USDC';
 
 /**
  * Encrypted message format (x25519-xsalsa20-poly1305)
@@ -27,9 +27,6 @@ export interface NetworkAddresses {
   usdcPool: `0x${string}`;
   usdcQueue: `0x${string}`;
   usdcToken: `0x${string}`;
-  cbbtcPool: `0x${string}`;
-  cbbtcQueue: `0x${string}`;
-  cbbtcToken: `0x${string}`;
   chainId: number;
   relayUrl: string;
 }
@@ -121,7 +118,7 @@ export interface PrivateBalanceResult {
 /**
  * Pool type for relay operations
  */
-export type RelayPool = 'eth' | 'usdc' | 'cbbtc';
+export type RelayPool = 'eth' | 'usdc';
 
 /**
  * Type of relay transaction

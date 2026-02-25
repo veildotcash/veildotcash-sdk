@@ -11,7 +11,7 @@ import { formatUnits } from 'viem';
 import { handleCLIError, CLIError, ErrorCode } from '../errors.js';
 import type { RelayPool } from '../../types.js';
 
-const SUPPORTED_POOLS: RelayPool[] = ['eth', 'usdc', 'cbbtc'];
+const SUPPORTED_POOLS: RelayPool[] = ['eth', 'usdc'];
 
 /**
  * Fetch balance for a single pool and return structured output
@@ -88,7 +88,7 @@ async function fetchPoolBalance(
 export function createBalanceCommand(): Command {
   const balance = new Command('balance')
     .description('Show queue and private balances (all pools by default)')
-    .option('--pool <pool>', 'Pool to check (eth, usdc, cbbtc, or all)', 'all')
+    .option('--pool <pool>', 'Pool to check (eth, usdc, or all)', 'all')
     .option('--wallet-key <key>', 'Ethereum wallet key (or set WALLET_KEY env)')
     .option('--address <address>', 'Address to check (or derived from wallet key)')
     .option('--veil-key <key>', 'Veil private key (or set VEIL_KEY env)')

@@ -8,7 +8,7 @@ import { transfer, mergeUtxos } from '../../transfer.js';
 import { handleCLIError, CLIError, ErrorCode } from '../errors.js';
 import type { RelayPool } from '../../types.js';
 
-const SUPPORTED_ASSETS = ['ETH', 'USDC', 'CBBTC'];
+const SUPPORTED_ASSETS = ['ETH', 'USDC'];
 
 // Progress helper - writes to stderr so JSON output stays clean
 function progress(msg: string, quiet?: boolean) {
@@ -20,7 +20,7 @@ function progress(msg: string, quiet?: boolean) {
 export function createTransferCommand(): Command {
   const transferCmd = new Command('transfer')
     .description('Transfer privately within the pool to another registered address')
-    .argument('<asset>', 'Asset to transfer (ETH, USDC, or CBBTC)')
+    .argument('<asset>', 'Asset to transfer (ETH or USDC)')
     .argument('<amount>', 'Amount to transfer (e.g., 0.1)')
     .argument('<recipient>', 'Recipient address (must be registered)')
     .option('--veil-key <key>', 'Veil private key (or set VEIL_KEY env)')
@@ -96,7 +96,7 @@ export function createTransferCommand(): Command {
 export function createMergeCommand(): Command {
   const mergeCmd = new Command('merge')
     .description('Merge UTXOs by self-transfer (consolidate small UTXOs)')
-    .argument('<asset>', 'Asset to merge (ETH, USDC, or CBBTC)')
+    .argument('<asset>', 'Asset to merge (ETH or USDC)')
     .argument('<amount>', 'Amount to merge (e.g., 0.5)')
     .option('--veil-key <key>', 'Veil private key (or set VEIL_KEY env)')
     .option('--rpc-url <url>', 'RPC URL (or set RPC_URL env)')
