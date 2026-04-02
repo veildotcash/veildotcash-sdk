@@ -118,6 +118,12 @@ Examples:
 
         // Get address
         const resolvedAddress = resolveAddress({ address: options.address }, { required: true });
+        if (!resolvedAddress) {
+          throw new CLIError(
+            ErrorCode.WALLET_KEY_MISSING,
+            'Must provide --address, set SIGNER_ADDRESS, or set WALLET_KEY env.',
+          );
+        }
         const address = resolvedAddress.address;
 
         // Get keypair for private balance

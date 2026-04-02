@@ -148,9 +148,7 @@ Register the current `DEPOSIT_KEY` on-chain:
 veil register
 veil register --force
 veil register --json
-DEPOSIT_KEY=0x... veil register --unsigned --address 0xOWNER
 SIGNER_ADDRESS=0x... veil register --unsigned
-DEPOSIT_KEY=0x... veil register --unsigned --address 0xOWNER --force
 SIGNER_ADDRESS=0x... veil register --unsigned --force
 ```
 
@@ -169,8 +167,8 @@ Deposits treat the CLI amount as the **net** amount that lands in the pool. The 
 veil deposit ETH 0.1
 veil deposit USDC 100
 veil deposit ETH 0.1 --json
-DEPOSIT_KEY=0x... veil deposit ETH 0.1 --unsigned
-DEPOSIT_KEY=0x... veil deposit USDC 100 --unsigned
+veil deposit ETH 0.1 --unsigned
+veil deposit USDC 100 --unsigned
 ```
 
 Minimums:

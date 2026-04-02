@@ -126,10 +126,10 @@ export function loadEnv(): void {
     // Dynamic import to avoid bundling issues
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const dotenv = require('dotenv');
-    
+
     // Load .env.veil first (Veil-specific config)
     dotenv.config({ path: '.env.veil', quiet: true });
-    
+
     // Then load .env (for WALLET_KEY, RPC_URL if not in .env.veil)
     dotenv.config({ quiet: true });
   } catch {

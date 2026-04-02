@@ -36,6 +36,18 @@ function getDefaultEnvPath(): string {
 }
 
 /**
+ * Enforce mutually exclusive wallet env modes.
+ */
+function ensureAddressEnvConsistency(): void {
+  if (process.env.WALLET_KEY && process.env.SIGNER_ADDRESS) {
+    throw new CLIError(
+      ErrorCode.CONFIG_CONFLICT,
+      'WALLET_KEY and SIGNER_ADDRESS are mutually exclusive. Set only one.',
+    );
+  }
+}
+
+/**
  * Check if VEIL_KEY exists in an env file
  */
 function veilKeyExistsAt(envPath: string): boolean {
@@ -118,6 +130,7 @@ Examples:
 `)
     .action(async (options) => {
       try {
+        ensureAddressEnvConsistency();
         const envPath = getDefaultEnvPath();
         const useRandom = options.generate;
         const useSignature = options.signature;
