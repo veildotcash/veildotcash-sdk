@@ -5,7 +5,6 @@
 import type { WalletConfig } from './wallet.js';
 
 export interface CLIOptions {
-  walletKey?: string;
   rpcUrl?: string;
 }
 
@@ -13,11 +12,11 @@ export interface CLIOptions {
  * Get wallet configuration from CLI options and environment variables
  */
 export function getConfig(options: CLIOptions): WalletConfig {
-  const walletKey = options.walletKey || process.env.WALLET_KEY;
+  const walletKey = process.env.WALLET_KEY;
   const rpcUrl = options.rpcUrl || process.env.RPC_URL || 'https://mainnet.base.org';
 
   if (!walletKey) {
-    throw new Error('Wallet key required. Use --wallet-key or set WALLET_KEY environment variable.');
+    throw new Error('WALLET_KEY env var required. Set it before running this command.');
   }
 
   // Validate wallet key format

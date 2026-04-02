@@ -4,27 +4,45 @@
 
 import { Command } from 'commander';
 import { Keypair } from '../../keypair.js';
+import { handleCLIError, CLIError, ErrorCode } from '../errors.js';
+import { printFields, printJson, printLine } from '../output.js';
 
 export function createKeypairCommand(): Command {
   const keypair = new Command('keypair')
-    .description('Show current Veil keypair as JSON')
+    .description('Show your current Veil keypair')
+    .option('--json', 'Output as JSON')
+    .addHelpText('after', `
+Examples:
+  veil keypair
+  veil keypair --json
+`)
     .action(() => {
-      const veilKey = process.env.VEIL_KEY;
-      
-      if (!veilKey) {
-        console.log(JSON.stringify({ 
-          success: false, 
-          error: 'No keypair found. Run "veil init" first.' 
-        }, null, 2));
-        process.exit(1);
+      try {
+        const veilKey = process.env.VEIL_KEY;
+
+        if (!veilKey) {
+          throw new CLIError(ErrorCode.VEIL_KEY_MISSING, 'No keypair found. Run "veil init" first.');
+        }
+
+        const kp = new Keypair(veilKey);
+        const result = {
+          veilPrivateKey: kp.privkey,
+          depositKey: kp.depositKey(),
+        };
+
+        if ((keypair.opts() as { json?: boolean }).json) {
+          printJson(result);
+          return;
+        }
+
+        printLine('Veil keypair');
+        printFields([
+          { label: 'Veil private key', value: result.veilPrivateKey },
+          { label: 'Deposit key', value: result.depositKey },
+        ]);
+      } catch (error) {
+        handleCLIError(error);
       }
-      
-      const kp = new Keypair(veilKey);
-      
-      console.log(JSON.stringify({
-        veilPrivateKey: kp.privkey,
-        depositKey: kp.depositKey(),
-      }, null, 2));
     });
 
   return keypair;

@@ -37,6 +37,7 @@ The CLI may include an `action` or `step` field for context:
 - **Deposit**: `"step": "approve"` (USDC only) and `"step": "deposit"`
 
 These fields are informational and can be ignored by the signer.
+For `veil register --unsigned --force`, the CLI checks chain state first and chooses `"register"` vs `"changeDepositKey"` based on whether the address is already registered.
 
 ---
 
@@ -130,10 +131,16 @@ When serializing for a signer: `value` must be converted to a string (`tx.value?
 import { getQueueBalance, getPrivateBalance } from '@veil-cash/sdk';
 
 // Queue balance (pending deposits)
-const queue = await getQueueBalance(depositKey, 'eth');
+const queue = await getQueueBalance({
+  address: '0x...',
+  pool: 'eth',
+});
 
 // Private balance (in-pool UTXOs)
-const priv = await getPrivateBalance(keypair, 'eth');
+const priv = await getPrivateBalance({
+  keypair,
+  pool: 'eth',
+});
 ```
 
 ---
@@ -150,19 +157,20 @@ Install globally: `npm install -g @veil-cash/sdk`
 | `DEPOSIT_KEY` | Veil deposit key (public) |
 | `WALLET_KEY` | Ethereum wallet private key (for signing) |
 | `RPC_URL` | Base RPC URL (optional, defaults to public RPC) |
+| `RELAY_URL` | Override relay base URL for relayed CLI operations |
 
 ### Commands
 
 ```bash
-veil init --json                                   # Generate random keypair as JSON
-veil init --json --no-save                         # Generate without saving to disk
-veil init --sign-message --wallet-key 0x...        # Derive from wallet
+veil init --json                                   # Derive from wallet as JSON (default)
+veil init --json --no-save                         # Derive without saving to disk
+veil init --generate                               # Generate random keypair
 veil init --signature 0x...                        # Derive from signature
 
-veil keypair                                       # Show current keypair as JSON
+veil keypair                                       # Show current keypair
 
 veil register --unsigned --address 0x...           # Unsigned register payload
-veil register --unsigned --address 0x... --force   # Unsigned change-key payload
+veil register --unsigned --address 0x... --force   # Unsigned register/change-key payload (depends on chain state)
 
 veil deposit ETH 0.1 --unsigned                    # Unsigned ETH deposit payload
 veil deposit USDC 100 --unsigned                   # Unsigned USDC deposit payload(s)
@@ -170,8 +178,10 @@ veil deposit USDC 100 --unsigned                   # Unsigned USDC deposit paylo
 veil balance                                       # All pool balances
 veil balance --pool eth                            # ETH pool only
 veil balance --pool usdc                           # USDC pool only
+veil balance queue --pool eth                      # Queue-only balance
+veil balance private --pool eth                    # Private-only balance
 
-veil status                                        # Check config and service health
+veil status                                        # Check config, wallet ETH balance, and service health
 ```
 
 ### Error format
@@ -182,21 +192,23 @@ All CLI errors output JSON with a standardized `errorCode`:
 {
   "success": false,
   "errorCode": "VEIL_KEY_MISSING",
-  "error": "VEIL_KEY required. Use --veil-key or set VEIL_KEY env"
+  "error": "VEIL_KEY required. Set VEIL_KEY env"
 }
 ```
 
 Common codes: `VEIL_KEY_MISSING`, `WALLET_KEY_MISSING`, `DEPOSIT_KEY_MISSING`,
-`INVALID_AMOUNT`, `INSUFFICIENT_BALANCE`, `CONTRACT_ERROR`, `NETWORK_ERROR`.
+`INVALID_AMOUNT`, `INSUFFICIENT_BALANCE`, `CONTRACT_ERROR`, `RPC_ERROR`.
 
 ---
 
 ## Deposit minimums
 
-| Asset | Minimum (net) | With 0.3% fee |
-|-------|--------------|----------------|
-| ETH | 0.01 | ~0.01003 |
-| USDC | 10 | ~10.03 |
+| Asset | Minimum (net) | Notes |
+|-------|--------------|-------|
+| ETH | 0.01 | Fee (0.3%) added automatically via on-chain `getDepositAmountWithFee` |
+| USDC | 10 | Fee (0.3%) added automatically via on-chain `getDepositAmountWithFee` |
+
+The CLI amount is the **net** amount that lands in the pool. The fee is calculated on-chain and added to the transaction automatically — users do not need to account for it.
 
 ---
 

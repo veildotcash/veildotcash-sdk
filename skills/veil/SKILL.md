@@ -23,19 +23,21 @@ triggers:
 # Veil SDK
 
 SDK and CLI for [Veil Cash](https://veil.cash) privacy pools on Base (chain ID 8453).
-Package: `@veil-cash/sdk` on npm. All CLI commands output JSON by default.
+Package: `@veil-cash/sdk` on npm. The CLI is human-readable by default and supports `--json` for machine-readable output.
 
 ## Quick reference
 
 | Action | CLI (agent-friendly) | Programmatic |
 |--------|---------------------|--------------|
-| Generate keypair | `veil init --json` | `new Keypair()` |
-| Derive from wallet | `veil init --sign-message --wallet-key 0x...` | `Keypair.fromWalletKey(key)` |
+| Generate keypair | `veil init --generate --json` | `new Keypair()` |
+| Derive from wallet | `veil init --json` | `Keypair.fromWalletKey(key)` |
 | Show keypair | `veil keypair` | — |
 | Register (unsigned) | `veil register --unsigned --address 0x...` | `buildRegisterTx(depositKey, address)` |
 | Deposit ETH (unsigned) | `veil deposit ETH 0.1 --unsigned` | `buildDepositETHTx({ depositKey, amount })` |
 | Deposit USDC (unsigned) | `veil deposit USDC 100 --unsigned` | `buildApproveUSDCTx({ amount })` + `buildDepositUSDCTx({ depositKey, amount })` |
 | Check balance | `veil balance --pool eth` | `getPrivateBalance(...)` / `getQueueBalance(...)` |
+| Check queue balance | `veil balance queue --pool eth` | `getQueueBalance(...)` |
+| Check private balance | `veil balance private --pool eth` | `getPrivateBalance(...)` |
 | Check status | `veil status` | — |
 
 ---
@@ -49,13 +51,13 @@ The deposit key is registered on-chain; the private key is used for ZK proofs.
 
 ```bash
 # Random keypair — outputs JSON, does not write to disk
-veil init --json --no-save
+veil init --generate --json --no-save
 
 # Random keypair — saves to .env.veil
-veil init --json
+veil init --generate --json
 
-# Derive from Ethereum wallet (same keypair as frontend login)
-veil init --sign-message --wallet-key 0xWALLET_PRIVATE_KEY
+# Derive from Ethereum wallet (same keypair as frontend login) — default
+veil init
 
 # Derive from a pre-computed EIP-191 signature (Bankr, MPC, custodial, etc.)
 veil init --signature 0xSIGNATURE
@@ -102,9 +104,11 @@ Registration is a one-time on-chain operation that links an address to a deposit
 # Build unsigned register payload
 DEPOSIT_KEY=0x... veil register --unsigned --address 0xOWNER
 
-# Change deposit key (already registered with a different key)
+# Force update - checks chain state and changes the key only if already registered
 DEPOSIT_KEY=0x... veil register --unsigned --address 0xOWNER --force
 ```
+
+With `--unsigned --force`, the CLI checks on-chain registration state first. If the address is not registered yet, it returns a normal `register` payload instead of an invalid `changeDepositKey` payload.
 
 Output:
 
@@ -136,12 +140,12 @@ Add `value: '0'` and `chainId: 8453` when forwarding to a signer.
 
 ## 3. Deposit (build unsigned tx)
 
-Deposits send ETH or USDC into the privacy pool. Minimum: 0.01 ETH / 10 USDC (net after 0.3% fee).
+Deposits send ETH or USDC into the privacy pool. Minimum: 0.01 ETH / 10 USDC. The amount you specify is the **net** amount that lands in the pool; the 0.3% protocol fee is calculated on-chain and added automatically.
 
 ### CLI
 
 ```bash
-# ETH deposit — single payload
+# ETH deposit — single payload (amount is net; fee added automatically)
 DEPOSIT_KEY=0x... veil deposit ETH 0.1 --unsigned
 
 # USDC deposit — outputs array: [approve, deposit]
@@ -232,7 +236,7 @@ All `--unsigned` CLI output follows this shape, compatible with any signer that 
 The SDK does **not** sign or submit transactions. Hand the unsigned payload to your signer:
 
 1. **External wallet/MPC** — send the payload via your wallet SDK (viem, ethers, etc.)
-2. **Bankr / Moltbot** — forward the JSON to Bankr's arbitrary-transaction endpoint
+2. **Agent framework** — forward the JSON to your agent's arbitrary-transaction endpoint
 3. **Custodial API** — POST the payload to your custodial signer
 
 After submission, poll the signer or chain for the transaction hash and report the result.

@@ -4,57 +4,72 @@
 
 import { Command } from 'commander';
 import { getQueueBalance } from '../../balance.js';
+import { handleCLIError, CLIError, ErrorCode } from '../errors.js';
+import { clearProgress, createProgressReporter, printFields, printHeader, printJson, printList } from '../output.js';
 import { getAddress } from '../wallet.js';
 import type { RelayPool } from '../../types.js';
 
-export function createQueueBalanceCommand(): Command {
-  const balance = new Command('queue-balance')
+const SUPPORTED_POOLS: RelayPool[] = ['eth', 'usdc'];
+
+function printQueueBalanceHuman(result: Awaited<ReturnType<typeof getQueueBalance>>, pool: RelayPool): void {
+  printHeader(`Queue ${pool.toUpperCase()} Balance`);
+  printFields([
+    { label: 'Address', value: result.address },
+    { label: 'Balance', value: result.queueBalance },
+    { label: 'Pending', value: result.pendingCount },
+  ]);
+  if (result.pendingDeposits.length > 0) {
+    printList(
+      result.pendingDeposits.map((deposit) => `nonce ${deposit.nonce}: ${deposit.amount} (${deposit.status})`)
+    );
+  }
+}
+
+export function createQueueBalanceCommand(name = 'queue-balance'): Command {
+  const balance = new Command(name)
     .description('Show queue balance and pending deposits')
     .option('--pool <pool>', 'Pool to check (eth or usdc)', 'eth')
-    .option('--wallet-key <key>', 'Ethereum wallet key (or set WALLET_KEY env)')
-    .option('--address <address>', 'Address to check (or derived from wallet key)')
+    .option('--address <address>', 'Address to check (or derived from WALLET_KEY)')
     .option('--rpc-url <url>', 'RPC URL (or set RPC_URL env)')
-    .option('--quiet', 'Suppress progress output')
+    .option('--json', 'Output as JSON')
+    .addHelpText('after', `
+Examples:
+  veil balance queue
+  veil balance queue --pool usdc
+  veil balance queue --address 0x... --json
+`)
     .action(async (options) => {
       try {
         const pool = (options.pool || 'eth').toLowerCase() as RelayPool;
+        if (!SUPPORTED_POOLS.includes(pool)) {
+          throw new CLIError(ErrorCode.INVALID_AMOUNT, `Unsupported pool: ${options.pool}. Supported: ${SUPPORTED_POOLS.join(', ')}`);
+        }
 
-        // Get address
         let address: `0x${string}`;
         if (options.address) {
           address = options.address as `0x${string}`;
         } else {
-          const walletKey = options.walletKey || process.env.WALLET_KEY;
+          const walletKey = process.env.WALLET_KEY;
           if (!walletKey) {
-            throw new Error('Must provide --address or --wallet-key (or set WALLET_KEY env)');
+            throw new CLIError(ErrorCode.WALLET_KEY_MISSING, 'Must provide --address or set WALLET_KEY env');
           }
           address = getAddress(walletKey as `0x${string}`);
         }
 
-        // Progress callback - writes to stderr so JSON output is clean
-        const onProgress = options.quiet 
-          ? undefined 
-          : (stage: string, detail?: string) => {
-              const msg = detail ? `${stage}: ${detail}` : stage;
-              process.stderr.write(`\r\x1b[K${msg}`);
-            };
-
-        // Get queue balance from SDK
         const rpcUrl = options.rpcUrl || process.env.RPC_URL;
+        const onProgress = createProgressReporter();
         const result = await getQueueBalance({ address, pool, rpcUrl, onProgress });
+        clearProgress();
 
-        // Clear progress line
-        if (!options.quiet) {
-          process.stderr.write('\r\x1b[K');
+        if (options.json) {
+          printJson(result);
+          return;
         }
 
-        console.log(JSON.stringify(result, null, 2));
+        printQueueBalanceHuman(result, pool);
       } catch (error) {
-        // Clear progress line on error
-        process.stderr.write('\r\x1b[K');
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        console.log(JSON.stringify({ success: false, error: errorMessage }));
-        process.exit(1);
+        clearProgress();
+        handleCLIError(error);
       }
     });
 

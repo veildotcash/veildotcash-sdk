@@ -23,6 +23,8 @@ npm-debug.log*
 .env.veil
 .env.local
 .env.*.local
+.env.rotate-wallet.bak
+scripts/local/
 
 # TypeScript cache
 *.tsbuildinfo

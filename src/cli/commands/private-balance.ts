@@ -5,46 +5,60 @@
 import { Command } from 'commander';
 import { getPrivateBalance } from '../../balance.js';
 import { Keypair } from '../../keypair.js';
+import { handleCLIError, CLIError, ErrorCode } from '../errors.js';
+import { clearProgress, createProgressReporter, printFields, printHeader, printJson, printList } from '../output.js';
 import type { RelayPool } from '../../types.js';
 
-export function createPrivateBalanceCommand(): Command {
-  const privateBalance = new Command('private-balance')
+const SUPPORTED_POOLS: RelayPool[] = ['eth', 'usdc'];
+
+function printPrivateBalanceHuman(result: Awaited<ReturnType<typeof getPrivateBalance>>, pool: RelayPool, showUtxos: boolean): void {
+  printHeader(`Private ${pool.toUpperCase()} Balance`);
+  printFields([
+    { label: 'Balance', value: result.privateBalance },
+    { label: 'UTXOs', value: result.utxoCount },
+    { label: 'Unspent', value: result.unspentCount },
+    { label: 'Spent', value: result.spentCount },
+  ]);
+
+  if (showUtxos) {
+    printList(
+      result.utxos.map((utxo) => `#${utxo.index}  ${utxo.amount} (${utxo.isSpent ? 'spent' : 'unspent'})`)
+    );
+  }
+}
+
+export function createPrivateBalanceCommand(name = 'private-balance'): Command {
+  const privateBalance = new Command(name)
     .description('Show private balance (requires VEIL_KEY)')
     .option('--pool <pool>', 'Pool to check (eth or usdc)', 'eth')
     .option('--veil-key <key>', 'Veil private key (or set VEIL_KEY env)')
     .option('--rpc-url <url>', 'RPC URL (or set RPC_URL env)')
     .option('--show-utxos', 'Show individual UTXO details')
-    .option('--quiet', 'Suppress progress output')
+    .option('--json', 'Output as JSON')
+    .addHelpText('after', `
+Examples:
+  veil balance private
+  veil balance private --pool usdc --show-utxos
+  veil balance private --json
+`)
     .action(async (options) => {
       try {
         const pool = (options.pool || 'eth').toLowerCase() as RelayPool;
+        if (!SUPPORTED_POOLS.includes(pool)) {
+          throw new CLIError(ErrorCode.INVALID_AMOUNT, `Unsupported pool: ${options.pool}. Supported: ${SUPPORTED_POOLS.join(', ')}`);
+        }
 
-        // Get keypair
         const veilKey = options.veilKey || process.env.VEIL_KEY;
         if (!veilKey) {
-          throw new Error('Must provide --veil-key or set VEIL_KEY env');
+          throw new CLIError(ErrorCode.VEIL_KEY_MISSING, 'Must provide --veil-key or set VEIL_KEY env');
         }
 
         const keypair = new Keypair(veilKey);
         const rpcUrl = options.rpcUrl || process.env.RPC_URL;
-
-        // Progress callback - writes to stderr so JSON output is clean
-        const onProgress = options.quiet 
-          ? undefined 
-          : (stage: string, detail?: string) => {
-              const msg = detail ? `${stage}: ${detail}` : stage;
-              process.stderr.write(`\r\x1b[K${msg}`);
-            };
-
-        // Get private balance from SDK
+        const onProgress = createProgressReporter();
         const result = await getPrivateBalance({ keypair, pool, rpcUrl, onProgress });
+        clearProgress();
 
-        // Clear progress line
-        if (!options.quiet) {
-          process.stderr.write('\r\x1b[K');
-        }
-
-        // Format output
         const output: Record<string, unknown> = {
           pool: pool.toUpperCase(),
           privateBalance: result.privateBalance,
@@ -59,13 +73,15 @@ export function createPrivateBalanceCommand(): Command {
           output.utxos = result.utxos;
         }
 
-        console.log(JSON.stringify(output, null, 2));
+        if (options.json) {
+          printJson(output);
+          return;
+        }
+
+        printPrivateBalanceHuman(result, pool, Boolean(options.showUtxos));
       } catch (error) {
-        // Clear progress line on error
-        process.stderr.write('\r\x1b[K');
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        console.log(JSON.stringify({ success: false, error: errorMessage }));
-        process.exit(1);
+        clearProgress();
+        handleCLIError(error);
       }
     });
 

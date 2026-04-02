@@ -6,9 +6,12 @@ import { Command } from 'commander';
 import { getQueueBalance, getPrivateBalance } from '../../balance.js';
 import { POOL_CONFIG } from '../../addresses.js';
 import { Keypair } from '../../keypair.js';
-import { getAddress } from '../wallet.js';
+import { getAddress, getWalletBalances } from '../wallet.js';
 import { formatUnits } from 'viem';
 import { handleCLIError, CLIError, ErrorCode } from '../errors.js';
+import { clearProgress, createProgressReporter, maskValue, printFields, printHeader, printJson, printLine, printList, printSection } from '../output.js';
+import { createPrivateBalanceCommand } from './private-balance.js';
+import { createQueueBalanceCommand } from './queue-balance.js';
 import type { RelayPool } from '../../types.js';
 
 const SUPPORTED_POOLS: RelayPool[] = ['eth', 'usdc'];
@@ -89,11 +92,18 @@ export function createBalanceCommand(): Command {
   const balance = new Command('balance')
     .description('Show queue and private balances (all pools by default)')
     .option('--pool <pool>', 'Pool to check (eth, usdc, or all)', 'all')
-    .option('--wallet-key <key>', 'Ethereum wallet key (or set WALLET_KEY env)')
-    .option('--address <address>', 'Address to check (or derived from wallet key)')
+    .option('--address <address>', 'Address to check (or derived from WALLET_KEY)')
     .option('--veil-key <key>', 'Veil private key (or set VEIL_KEY env)')
     .option('--rpc-url <url>', 'RPC URL (or set RPC_URL env)')
-    .option('--quiet', 'Suppress progress output')
+    .option('--json', 'Output as JSON')
+    .addHelpText('after', `
+Examples:
+  veil balance
+  veil balance --pool eth
+  veil balance queue --pool usdc
+  veil balance private --show-utxos
+  veil balance --json
+`)
     .action(async (options) => {
       try {
         const poolArg = (options.pool || 'all').toLowerCase();
@@ -110,9 +120,9 @@ export function createBalanceCommand(): Command {
         if (options.address) {
           address = options.address as `0x${string}`;
         } else {
-          const walletKey = options.walletKey || process.env.WALLET_KEY;
+          const walletKey = process.env.WALLET_KEY;
           if (!walletKey) {
-            throw new CLIError(ErrorCode.WALLET_KEY_MISSING, 'Must provide --address or --wallet-key (or set WALLET_KEY env)');
+            throw new CLIError(ErrorCode.WALLET_KEY_MISSING, 'Must provide --address or set WALLET_KEY env');
           }
           address = getAddress(walletKey as `0x${string}`);
         }
@@ -123,56 +133,138 @@ export function createBalanceCommand(): Command {
 
         const rpcUrl = options.rpcUrl || process.env.RPC_URL;
 
-        // Progress callback
-        const onProgress = options.quiet 
-          ? undefined 
-          : (stage: string, detail?: string) => {
-              const msg = detail ? `${stage}: ${detail}` : stage;
-              process.stderr.write(`\r\x1b[K${msg}`);
-            };
+        const onProgress = createProgressReporter();
 
         // Get deposit key if available
         const depositKey = process.env.DEPOSIT_KEY || (keypair ? keypair.depositKey() : null);
 
         // Single pool mode -- flat output (backwards compatible)
         if (poolsToQuery.length === 1) {
-          const poolResult = await fetchPoolBalance(poolsToQuery[0], address, keypair, rpcUrl, onProgress);
+          const [poolResult, walletBalances] = await Promise.all([
+            fetchPoolBalance(poolsToQuery[0], address, keypair, rpcUrl, onProgress),
+            getWalletBalances(address, rpcUrl),
+          ]);
 
-          // Clear progress line
-          if (!options.quiet) process.stderr.write('\r\x1b[K');
+          clearProgress();
 
           const output = {
             address,
             depositKey: depositKey || null,
+            wallet: walletBalances,
             ...poolResult,
           };
 
-          console.log(JSON.stringify(output, null, 2));
+          if (options.json) {
+            printJson(output);
+            return;
+          }
+
+          printCombinedBalanceHuman(output);
           return;
         }
 
         // All pools mode -- nested output
-        const pools: Record<string, unknown>[] = [];
-        for (const pool of poolsToQuery) {
-          const poolResult = await fetchPoolBalance(pool, address, keypair, rpcUrl, onProgress);
-          pools.push(poolResult);
-        }
+        const poolPromises = poolsToQuery.map(pool =>
+          fetchPoolBalance(pool, address, keypair, rpcUrl, onProgress),
+        );
+        const [walletBalances, ...poolResults] = await Promise.all([
+          getWalletBalances(address, rpcUrl),
+          ...poolPromises,
+        ]);
 
-        // Clear progress line
-        if (!options.quiet) process.stderr.write('\r\x1b[K');
+        clearProgress();
 
         const output = {
           address,
           depositKey: depositKey || null,
-          pools,
+          wallet: walletBalances,
+          pools: poolResults,
         };
 
-        console.log(JSON.stringify(output, null, 2));
+        if (options.json) {
+          printJson(output);
+          return;
+        }
+
+        printMultiPoolBalanceHuman(output);
       } catch (error) {
-        process.stderr.write('\r\x1b[K');
+        clearProgress();
         handleCLIError(error);
       }
     });
 
+  balance.addCommand(createQueueBalanceCommand('queue'));
+  balance.addCommand(createPrivateBalanceCommand('private'));
+
   return balance;
+}
+
+function printPoolHuman(output: Record<string, unknown>): void {
+  const symbol = output.symbol as string;
+
+  printSection(`${output.pool}`);
+  printFields([
+    { label: 'Total', value: `${output.totalBalance} ${symbol}` },
+  ]);
+
+  const privateData = output.private as { balance?: string | null; balanceWei?: string; utxoCount?: number; note?: string; utxos?: Array<{ index: number; amount: string }> };
+  if (privateData.note) {
+    printFields([
+      { label: 'Private', value: privateData.note },
+    ]);
+  } else {
+    printFields([
+      { label: 'Private', value: `${privateData.balance} ${symbol}` },
+    ]);
+  }
+
+  const queueData = output.queue as { balance: string; balanceWei: string; count: number; deposits: Array<{ nonce: string | number; amount: string; status: string }> };
+  printFields([
+    { label: 'Queue', value: `${queueData.balance} ${symbol}` },
+    { label: 'Pending', value: queueData.count },
+  ]);
+  if (queueData.deposits.length > 0) {
+    printList(
+      queueData.deposits.map((d) => `nonce ${d.nonce}: ${d.amount} (${d.status})`)
+    );
+  }
+}
+
+function printCombinedBalanceHuman(output: Record<string, unknown>): void {
+  const wallet = output.wallet as { eth: string; usdc: string };
+
+  printHeader(`${output.pool} Balance`);
+  printFields([
+    { label: 'Address', value: output.address },
+    { label: 'Deposit key', value: typeof output.depositKey === 'string' ? maskValue(output.depositKey) : 'not set' },
+  ]);
+
+  printSection('Wallet (public)');
+  printFields([
+    { label: 'ETH', value: `${wallet.eth} ETH` },
+    { label: 'USDC', value: `${wallet.usdc} USDC` },
+  ]);
+
+  printPoolHuman(output);
+  printLine();
+}
+
+function printMultiPoolBalanceHuman(output: { address: string; depositKey: string | null; wallet: { eth: string; usdc: string }; pools: Record<string, unknown>[] }): void {
+  printHeader('Balances');
+  printFields([
+    { label: 'Address', value: output.address },
+    { label: 'Deposit key', value: output.depositKey ? maskValue(output.depositKey) : 'not set' },
+  ]);
+
+  printSection('Wallet (public)');
+  printFields([
+    { label: 'ETH', value: `${output.wallet.eth} ETH` },
+    { label: 'USDC', value: `${output.wallet.usdc} USDC` },
+  ]);
+
+  for (const poolResult of output.pools) {
+    printPoolHuman(poolResult);
+  }
+
+  printLine();
 }
