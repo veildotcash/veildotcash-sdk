@@ -1,10 +1,9 @@
 ---
-name: veil-cli
-version: 1.0.0
+name: @veil-cash/sdk
+version: 0.5.0
 description: >
-  Use the Veil Cash CLI to initialize keys, register deposit keys, deposit,
-  check balances, inspect status, and perform private actions on Base. This
-  skill is for CLI-first agent workflows, especially OpenClaw-style usage.
+  SDK and CLI for interacting with Veil Cash privacy pools on Base. This skill
+  is written for CLI-first agent workflows, especially OpenClaw-style usage.
 author: veildotcash
 permissions:
   - filesystem:read
@@ -48,7 +47,7 @@ Default behavior:
 | Show current keypair | `veil keypair` |
 | Check setup and relay | `veil status` |
 | Register deposit key | `veil register` |
-| Build unsigned register payload | `veil register --unsigned --address 0x...` |
+| Build unsigned register payload | `SIGNER_ADDRESS=0x... veil register --unsigned` |
 | Deposit ETH | `veil deposit ETH 0.1` |
 | Deposit USDC | `veil deposit USDC 100` |
 | Show balances | `veil balance` |
@@ -64,11 +63,22 @@ Default behavior:
 
 Veil uses:
 
-- `WALLET_KEY` for public wallet actions like `register` and `deposit`
+- `WALLET_KEY` when the CLI should sign and send public transactions itself
+- `SIGNER_ADDRESS` when signing happens outside the CLI and you need address-aware reads or `--unsigned` payloads
 - `VEIL_KEY` for private actions like `withdraw`, `transfer`, and `merge`
 - `DEPOSIT_KEY` as the public key registered on-chain for deposits
 
-Typical first-run flow:
+Do not set `WALLET_KEY` and `SIGNER_ADDRESS` at the same time. They are mutually exclusive.
+
+Choose one public-wallet mode:
+
+- Local signing mode: set `WALLET_KEY` and let the CLI sign `register` / `deposit` directly.
+- External signing mode: set `SIGNER_ADDRESS` and use `--unsigned` when another signer will submit transactions on your behalf.
+
+This is not strictly "agent vs non-agent". Either mode can be used by an agent depending on how that agent is configured.
+Bankr-style agents typically use `SIGNER_ADDRESS` because Bankr does the signing and submission for them, so the CLI should return unsigned payloads instead of sending transactions.
+
+Typical first-run flow with local signing:
 
 ```bash
 export WALLET_KEY=0x...
@@ -80,6 +90,22 @@ veil balance
 ```
 
 `veil init` defaults to wallet-derived key generation. Use `--generate` for a random keypair instead.
+
+Typical first-run flow with external signing:
+
+```env
+VEIL_KEY=0x...
+DEPOSIT_KEY=0x...
+SIGNER_ADDRESS=0x...
+RPC_URL=https://mainnet.base.org
+```
+
+```bash
+veil init --signature 0x...
+veil status
+veil register --unsigned
+veil deposit ETH 0.1 --unsigned
+```
 
 ---
 
@@ -110,6 +136,8 @@ veil status --json
 - whether `WALLET_KEY` is missing vs invalid
 - registration and relay status
 
+`veil status` can resolve registration using `SIGNER_ADDRESS` whenever signing is handled externally and `WALLET_KEY` is intentionally absent.
+
 ---
 
 ## 3. Register and Deposit
@@ -121,11 +149,16 @@ veil register
 veil register --force
 veil register --json
 DEPOSIT_KEY=0x... veil register --unsigned --address 0xOWNER
+SIGNER_ADDRESS=0x... veil register --unsigned
 DEPOSIT_KEY=0x... veil register --unsigned --address 0xOWNER --force
+SIGNER_ADDRESS=0x... veil register --unsigned --force
 ```
 
 Important:
 
+- `--address` is optional in unsigned mode when `SIGNER_ADDRESS` is set.
+- Use `WALLET_KEY` if you want the CLI to sign and send the transaction itself.
+- Use `SIGNER_ADDRESS` if another system will sign on your behalf and you need an unsigned payload.
 - `veil register --unsigned --force` checks chain state first.
 - If the address is already registered, it returns `changeDepositKey`.
 - If the address is not registered yet, it returns a normal `register` payload.
@@ -250,6 +283,9 @@ Use `skills/veil/reference.md` for the lower-level payload details.
 
 - Store `VEIL_KEY` and `DEPOSIT_KEY` in `.env.veil`.
 - Store `WALLET_KEY` in `.env` or the shell environment.
+- Use `SIGNER_ADDRESS` when the signer is external and the CLI should not hold the wallet key.
+- `SIGNER_ADDRESS` is especially useful for Bankr-style agents that request `--unsigned` payloads and sign separately.
+- `WALLET_KEY` and `SIGNER_ADDRESS` are mutually exclusive. Set only one.
 - Never pass sensitive wallet keys on the CLI.
 - Never commit secrets to source control.
 

@@ -5,14 +5,14 @@
 import { Command } from 'commander';
 import { buildRegisterTx, buildChangeDepositKeyTx } from '../../deposit.js';
 import { sendTransaction, getAddress, isRegistered } from '../wallet.js';
-import { getConfig } from '../config.js';
+import { getConfig, resolveAddress } from '../config.js';
 import { handleCLIError, CLIError, ErrorCode } from '../errors.js';
 import { maskValue, printFields, printHeader, printJson, printLine, txUrl } from '../output.js';
 
 export function createRegisterCommand(): Command {
   const register = new Command('register')
     .description('Register or update your deposit key on-chain')
-    .option('--address <address>', 'Owner address (required with --unsigned)')
+    .option('--address <address>', 'Signer address (optional if SIGNER_ADDRESS or WALLET_KEY is set in --unsigned mode)')
     .option('--rpc-url <url>', 'RPC URL (or set RPC_URL env)')
     .option('--unsigned', 'Output unsigned transaction payload instead of sending')
     .option('--force', 'Change deposit key even if already registered')
@@ -22,6 +22,7 @@ Examples:
   veil register
   veil register --force
   veil register --unsigned --address 0x...
+  SIGNER_ADDRESS=0x... veil register --unsigned
   veil register --json
 `)
     .action(async (options) => {
@@ -36,16 +37,8 @@ Examples:
 
         // Handle --unsigned mode (no wallet required, just build payload)
         if (options.unsigned) {
-          let address: `0x${string}`;
-          if (options.address) {
-            address = options.address as `0x${string}`;
-          } else {
-            const walletKey = process.env.WALLET_KEY;
-            if (!walletKey) {
-              throw new CLIError(ErrorCode.WALLET_KEY_MISSING, 'Must provide --address or set WALLET_KEY env for --unsigned mode');
-            }
-            address = getAddress(walletKey as `0x${string}`);
-          }
+          const resolvedAddress = resolveAddress({ address: options.address }, { required: true });
+          const address = resolvedAddress.address;
 
           const rpcUrl = options.rpcUrl || process.env.RPC_URL;
           const isChange = options.force

@@ -17,6 +17,8 @@
 - Remove "Gas used" from all command output (human and JSON)
 - Remove "Checked" field from `veil status` human output; show meaningful status messages instead
 - `veil status` now distinguishes missing vs invalid `WALLET_KEY` and shows public ETH balance when available
+- Add `SIGNER_ADDRESS` for unsigned/query CLI flows (`status`, `balance`, `register --unsigned`) when signing is handled externally
+- `WALLET_KEY` and `SIGNER_ADDRESS` are now treated as mutually exclusive CLI env vars
 - `veil register --force` now always sends the transaction, even if the on-chain key already matches
 - `veil register --unsigned --force` now checks chain state first and emits `register` vs `changeDepositKey` accordingly
 - Clean up `--unsigned` description (remove Bankr-specific wording)

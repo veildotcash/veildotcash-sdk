@@ -82,11 +82,11 @@ import { buildRegisterTx, buildChangeDepositKeyTx } from '@veil-cash/sdk';
 import type { TransactionData } from '@veil-cash/sdk';
 
 // First-time registration
-const tx: TransactionData = buildRegisterTx(depositKey, '0xOWNER_ADDRESS');
+const tx: TransactionData = buildRegisterTx(depositKey, '0xSIGNER_ADDRESS');
 // tx = { to: '0x...', data: '0x...' }
 
 // Update existing deposit key
-const changeTx: TransactionData = buildChangeDepositKeyTx(newDepositKey, '0xOWNER_ADDRESS');
+const changeTx: TransactionData = buildChangeDepositKeyTx(newDepositKey, '0xSIGNER_ADDRESS');
 ```
 
 `TransactionData` type:
@@ -156,8 +156,11 @@ Install globally: `npm install -g @veil-cash/sdk`
 | `VEIL_KEY` | Veil private key (for ZK proofs) |
 | `DEPOSIT_KEY` | Veil deposit key (public) |
 | `WALLET_KEY` | Ethereum wallet private key (for signing) |
+| `SIGNER_ADDRESS` | Ethereum address for unsigned/query flows when signing is external |
 | `RPC_URL` | Base RPC URL (optional, defaults to public RPC) |
 | `RELAY_URL` | Override relay base URL for relayed CLI operations |
+
+`WALLET_KEY` and `SIGNER_ADDRESS` are mutually exclusive. Use `SIGNER_ADDRESS` only for address-only CLI flows.
 
 ### Commands
 
@@ -169,8 +172,8 @@ veil init --signature 0x...                        # Derive from signature
 
 veil keypair                                       # Show current keypair
 
-veil register --unsigned --address 0x...           # Unsigned register payload
-veil register --unsigned --address 0x... --force   # Unsigned register/change-key payload (depends on chain state)
+SIGNER_ADDRESS=0x... veil register --unsigned       # Unsigned register payload
+SIGNER_ADDRESS=0x... veil register --unsigned --force # Unsigned register/change-key payload (depends on chain state)
 
 veil deposit ETH 0.1 --unsigned                    # Unsigned ETH deposit payload
 veil deposit USDC 100 --unsigned                   # Unsigned USDC deposit payload(s)
@@ -181,7 +184,7 @@ veil balance --pool usdc                           # USDC pool only
 veil balance queue --pool eth                      # Queue-only balance
 veil balance private --pool eth                    # Private-only balance
 
-veil status                                        # Check config, wallet ETH balance, and service health
+veil status                                        # Check config, wallet ETH balance, registration, and service health
 ```
 
 ### Error format
@@ -197,7 +200,7 @@ All CLI errors output JSON with a standardized `errorCode`:
 ```
 
 Common codes: `VEIL_KEY_MISSING`, `WALLET_KEY_MISSING`, `DEPOSIT_KEY_MISSING`,
-`INVALID_AMOUNT`, `INSUFFICIENT_BALANCE`, `CONTRACT_ERROR`, `RPC_ERROR`.
+`CONFIG_CONFLICT`, `INVALID_AMOUNT`, `INSUFFICIENT_BALANCE`, `CONTRACT_ERROR`, `RPC_ERROR`.
 
 ---
 

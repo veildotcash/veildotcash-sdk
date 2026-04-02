@@ -6,7 +6,8 @@ import { Command } from 'commander';
 import { getQueueBalance, getPrivateBalance } from '../../balance.js';
 import { POOL_CONFIG } from '../../addresses.js';
 import { Keypair } from '../../keypair.js';
-import { getAddress, getWalletBalances } from '../wallet.js';
+import { getWalletBalances } from '../wallet.js';
+import { resolveAddress } from '../config.js';
 import { formatUnits } from 'viem';
 import { handleCLIError, CLIError, ErrorCode } from '../errors.js';
 import { clearProgress, createProgressReporter, maskValue, printFields, printHeader, printJson, printLine, printList, printSection } from '../output.js';
@@ -92,7 +93,7 @@ export function createBalanceCommand(): Command {
   const balance = new Command('balance')
     .description('Show queue and private balances (all pools by default)')
     .option('--pool <pool>', 'Pool to check (eth, usdc, or all)', 'all')
-    .option('--address <address>', 'Address to check (or derived from WALLET_KEY)')
+    .option('--address <address>', 'Address to check (or derived from WALLET_KEY / SIGNER_ADDRESS)')
     .option('--veil-key <key>', 'Veil private key (or set VEIL_KEY env)')
     .option('--rpc-url <url>', 'RPC URL (or set RPC_URL env)')
     .option('--json', 'Output as JSON')
@@ -116,16 +117,8 @@ Examples:
         const poolsToQuery: RelayPool[] = poolArg === 'all' ? [...SUPPORTED_POOLS] : [poolArg as RelayPool];
 
         // Get address
-        let address: `0x${string}`;
-        if (options.address) {
-          address = options.address as `0x${string}`;
-        } else {
-          const walletKey = process.env.WALLET_KEY;
-          if (!walletKey) {
-            throw new CLIError(ErrorCode.WALLET_KEY_MISSING, 'Must provide --address or set WALLET_KEY env');
-          }
-          address = getAddress(walletKey as `0x${string}`);
-        }
+        const resolvedAddress = resolveAddress({ address: options.address }, { required: true });
+        const address = resolvedAddress.address;
 
         // Get keypair for private balance
         const veilKey = options.veilKey || process.env.VEIL_KEY;

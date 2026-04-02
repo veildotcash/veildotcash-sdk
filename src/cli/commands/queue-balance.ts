@@ -6,7 +6,7 @@ import { Command } from 'commander';
 import { getQueueBalance } from '../../balance.js';
 import { handleCLIError, CLIError, ErrorCode } from '../errors.js';
 import { clearProgress, createProgressReporter, printFields, printHeader, printJson, printList } from '../output.js';
-import { getAddress } from '../wallet.js';
+import { resolveAddress } from '../config.js';
 import type { RelayPool } from '../../types.js';
 
 const SUPPORTED_POOLS: RelayPool[] = ['eth', 'usdc'];
@@ -29,7 +29,7 @@ export function createQueueBalanceCommand(name = 'queue-balance'): Command {
   const balance = new Command(name)
     .description('Show queue balance and pending deposits')
     .option('--pool <pool>', 'Pool to check (eth or usdc)', 'eth')
-    .option('--address <address>', 'Address to check (or derived from WALLET_KEY)')
+    .option('--address <address>', 'Address to check (or derived from WALLET_KEY / SIGNER_ADDRESS)')
     .option('--rpc-url <url>', 'RPC URL (or set RPC_URL env)')
     .option('--json', 'Output as JSON')
     .addHelpText('after', `
@@ -45,16 +45,8 @@ Examples:
           throw new CLIError(ErrorCode.INVALID_AMOUNT, `Unsupported pool: ${options.pool}. Supported: ${SUPPORTED_POOLS.join(', ')}`);
         }
 
-        let address: `0x${string}`;
-        if (options.address) {
-          address = options.address as `0x${string}`;
-        } else {
-          const walletKey = process.env.WALLET_KEY;
-          if (!walletKey) {
-            throw new CLIError(ErrorCode.WALLET_KEY_MISSING, 'Must provide --address or set WALLET_KEY env');
-          }
-          address = getAddress(walletKey as `0x${string}`);
-        }
+        const resolvedAddress = resolveAddress({ address: options.address }, { required: true });
+        const address = resolvedAddress.address;
 
         const rpcUrl = options.rpcUrl || process.env.RPC_URL;
         const onProgress = createProgressReporter();

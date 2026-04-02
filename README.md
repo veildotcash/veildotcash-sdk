@@ -96,7 +96,7 @@ veil status
 veil status --json
 ```
 
-`veil status` also shows the derived wallet address, public ETH balance when available, and clearer registration status when `WALLET_KEY` is missing or invalid.
+`veil status` also shows the resolved address, public ETH balance when available, and clearer registration status when `WALLET_KEY` is missing or invalid. For unsigned or agent flows, set `SIGNER_ADDRESS` to let `veil status` and balance commands resolve registration without a wallet key.
 
 ### Registration and Deposits
 
@@ -107,9 +107,10 @@ veil register
 veil register --force
 veil register --json
 veil register --unsigned --address 0x...
+SIGNER_ADDRESS=0x... veil register --unsigned
 ```
 
-In `--unsigned` mode, `veil register --force` checks on-chain state first. It emits a `changeDepositKey` payload only if the address is already registered; otherwise it emits a normal `register` payload.
+In `--unsigned` mode, `--address` is optional when `SIGNER_ADDRESS` is set. `veil register --force` checks on-chain state first and emits a `changeDepositKey` payload only if the address is already registered; otherwise it emits a normal `register` payload.
 
 Deposit ETH or USDC into Veil. The amount you specify is the **net** amount that arrives in your Veil balance. The 0.3% protocol fee is calculated on-chain and added automatically:
 
@@ -180,7 +181,7 @@ The CLI uses two config files:
 | File | Purpose |
 |------|---------|
 | `.env.veil` | Veil keypair (VEIL_KEY, DEPOSIT_KEY) - created by `veil init` |
-| `.env` | Wallet config (WALLET_KEY, RPC_URL) - your existing config |
+| `.env` | Wallet config (WALLET_KEY or SIGNER_ADDRESS, RPC_URL) - your existing config |
 
 ### Variables
 
@@ -189,8 +190,11 @@ The CLI uses two config files:
 | `VEIL_KEY` | Your Veil private key (for ZK proofs, withdrawals, transfers) |
 | `DEPOSIT_KEY` | Your Veil deposit key (public, for register/deposit) |
 | `WALLET_KEY` | Ethereum wallet private key (for signing transactions) |
+| `SIGNER_ADDRESS` | Ethereum address for unsigned/query flows when signing is handled externally |
 | `RPC_URL` | Base RPC URL (optional, defaults to public RPC) |
 | `RELAY_URL` | Override relay base URL for relayed CLI operations and status checks |
+
+`WALLET_KEY` and `SIGNER_ADDRESS` are mutually exclusive. Use `WALLET_KEY` for commands that sign transactions, and `SIGNER_ADDRESS` for address-only agent flows like `status`, `balance`, and `register --unsigned`.
 
 ## Error Handling
 
@@ -211,6 +215,7 @@ Commands print human-readable success output by default. Errors are standardized
 | `VEIL_KEY_MISSING` | VEIL_KEY not provided |
 | `WALLET_KEY_MISSING` | WALLET_KEY not provided |
 | `DEPOSIT_KEY_MISSING` | DEPOSIT_KEY not provided |
+| `CONFIG_CONFLICT` | Conflicting CLI env vars provided |
 | `INVALID_ADDRESS` | Invalid Ethereum address format |
 | `INVALID_AMOUNT` | Invalid or below minimum amount |
 | `INSUFFICIENT_BALANCE` | Not enough ETH balance |

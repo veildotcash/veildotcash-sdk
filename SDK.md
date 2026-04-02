@@ -218,7 +218,7 @@ Human-readable output is the CLI default. Use `--json` for machine-readable resp
 veil init --json
 
 # Get unsigned transaction payloads for agent signing
-veil register --unsigned --address 0x...
+SIGNER_ADDRESS=0x... veil register --unsigned
 veil deposit ETH 0.1 --unsigned
 veil deposit USDC 100 --unsigned    # Outputs approve + deposit payloads
 
@@ -228,7 +228,9 @@ veil balance --pool usdc --json
 veil withdraw ETH 0.05 0xRecipient --json
 ```
 
-`veil status` reports clearer setup state for agents, including whether `WALLET_KEY` is missing vs invalid, plus the public ETH balance when it can be resolved.
+`SIGNER_ADDRESS` can be used for address-only agent flows such as `veil status`, `veil balance`, and `veil register --unsigned` when the signer manages the wallet externally. `WALLET_KEY` and `SIGNER_ADDRESS` are mutually exclusive, and signed commands still require `WALLET_KEY`.
+
+`veil status` reports clearer setup state for agents, including whether `WALLET_KEY` is missing vs invalid, plus the public ETH balance when it can be resolved from `WALLET_KEY` or `SIGNER_ADDRESS`.
 
 ### Bankr Integration
 
@@ -268,13 +270,14 @@ veil init --signature $SIG
 Use `--unsigned` to get signer-compatible transaction payloads:
 
 ```bash
-veil register --unsigned --address 0x...
-veil register --unsigned --address 0x... --force
+SIGNER_ADDRESS=0x... veil register --unsigned
+SIGNER_ADDRESS=0x... veil register --unsigned --force
 veil deposit ETH 0.1 --unsigned
 # {"to":"0x...","data":"0x...","value":"100000000000000000","chainId":8453}
 ```
 
 The `--unsigned` flag outputs a standard `{to, data, value, chainId}` payload compatible with any signer that accepts arbitrary transactions.
+When `SIGNER_ADDRESS` is set, `veil register --unsigned` no longer requires the `--address` flag.
 For `veil register --unsigned --force`, the CLI checks on-chain registration state first and emits `changeDepositKey` only when the address is already registered; otherwise it falls back to `register`.
 
 ### Programmatic SDK Usage
