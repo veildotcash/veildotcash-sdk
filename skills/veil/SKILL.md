@@ -1,11 +1,10 @@
 ---
-name: veil-sdk
+name: veil-cli
 version: 1.0.0
 description: >
-  Generate Veil Cash keypairs, build unsigned register and deposit transactions,
-  and produce signer-compatible payloads on Base. Use when the user or agent
-  needs Veil keypair generation, on-chain registration, ETH/USDC deposits,
-  or unsigned transaction payloads for external signers.
+  Use the Veil Cash CLI to initialize keys, register deposit keys, deposit,
+  check balances, inspect status, and perform private actions on Base. This
+  skill is for CLI-first agent workflows, especially OpenClaw-style usage.
 author: veildotcash
 permissions:
   - filesystem:read
@@ -13,203 +12,221 @@ permissions:
   - shell:exec
 triggers:
   - command: /veil
+  - pattern: veil init
   - pattern: veil keypair
+  - pattern: veil status
   - pattern: veil register
   - pattern: veil deposit
+  - pattern: veil balance
+  - pattern: veil withdraw
+  - pattern: veil transfer
+  - pattern: veil merge
   - pattern: unsigned payload
   - pattern: privacy pool
 ---
 
-# Veil SDK
+# Veil CLI
 
-SDK and CLI for [Veil Cash](https://veil.cash) privacy pools on Base (chain ID 8453).
-Package: `@veil-cash/sdk` on npm. The CLI is human-readable by default and supports `--json` for machine-readable output.
+Use the `veil` CLI for [Veil Cash](https://veil.cash) privacy pools on Base (chain ID `8453`).
+Package: `@veil-cash/sdk` on npm.
+
+Default behavior:
+
+- Human-readable output is the default.
+- Use `--json` for machine-readable output.
+- Use `--unsigned` to emit signer-compatible transaction payloads instead of sending transactions.
+- Sensitive wallet material should come from env vars, not CLI flags.
+
+---
 
 ## Quick reference
 
-| Action | CLI (agent-friendly) | Programmatic |
-|--------|---------------------|--------------|
-| Generate keypair | `veil init --generate --json` | `new Keypair()` |
-| Derive from wallet | `veil init --json` | `Keypair.fromWalletKey(key)` |
-| Show keypair | `veil keypair` | — |
-| Register (unsigned) | `veil register --unsigned --address 0x...` | `buildRegisterTx(depositKey, address)` |
-| Deposit ETH (unsigned) | `veil deposit ETH 0.1 --unsigned` | `buildDepositETHTx({ depositKey, amount })` |
-| Deposit USDC (unsigned) | `veil deposit USDC 100 --unsigned` | `buildApproveUSDCTx({ amount })` + `buildDepositUSDCTx({ depositKey, amount })` |
-| Check balance | `veil balance --pool eth` | `getPrivateBalance(...)` / `getQueueBalance(...)` |
-| Check queue balance | `veil balance queue --pool eth` | `getQueueBalance(...)` |
-| Check private balance | `veil balance private --pool eth` | `getPrivateBalance(...)` |
-| Check status | `veil status` | — |
+| Task | CLI |
+|------|-----|
+| Derive keypair from wallet | `veil init` |
+| Generate random keypair | `veil init --generate` |
+| Show current keypair | `veil keypair` |
+| Check setup and relay | `veil status` |
+| Register deposit key | `veil register` |
+| Build unsigned register payload | `veil register --unsigned --address 0x...` |
+| Deposit ETH | `veil deposit ETH 0.1` |
+| Deposit USDC | `veil deposit USDC 100` |
+| Show balances | `veil balance` |
+| Show queue only | `veil balance queue --pool eth` |
+| Show private only | `veil balance private --pool eth` |
+| Withdraw | `veil withdraw ETH 0.05 0xRecipient` |
+| Transfer privately | `veil transfer ETH 0.02 0xRecipient` |
+| Merge UTXOs | `veil merge ETH 0.1` |
 
 ---
 
-## 1. Keypair generation
+## 1. Setup
 
-A Veil keypair produces a **private key** (`VEIL_KEY`) and a **deposit key** (`DEPOSIT_KEY`).
-The deposit key is registered on-chain; the private key is used for ZK proofs.
+Veil uses:
 
-### CLI
+- `WALLET_KEY` for public wallet actions like `register` and `deposit`
+- `VEIL_KEY` for private actions like `withdraw`, `transfer`, and `merge`
+- `DEPOSIT_KEY` as the public key registered on-chain for deposits
+
+Typical first-run flow:
 
 ```bash
-# Random keypair — outputs JSON, does not write to disk
-veil init --generate --json --no-save
-
-# Random keypair — saves to .env.veil
-veil init --generate --json
-
-# Derive from Ethereum wallet (same keypair as frontend login) — default
+export WALLET_KEY=0x...
 veil init
-
-# Derive from a pre-computed EIP-191 signature (Bankr, MPC, custodial, etc.)
-veil init --signature 0xSIGNATURE
+veil register
+veil status
+veil deposit ETH 0.1
+veil balance
 ```
 
-`--json` output shape:
-
-```json
-{
-  "veilKey": "0x...",
-  "veilPrivateKey": "0x...",
-  "depositKey": "0x...",
-  "derivation": "random"
-}
-```
-
-`veilKey` and `veilPrivateKey` are the same value.
-
-### Programmatic
-
-```typescript
-import { Keypair } from '@veil-cash/sdk';
-
-const keypair = new Keypair();               // random
-const depositKey = keypair.depositKey();      // register this on-chain
-const privkey = keypair.privkey;              // store securely
-
-// Or derive from wallet
-const derived = await Keypair.fromWalletKey('0xWALLET_KEY');
-
-// Or from a raw EIP-191 signature
-const fromSig = Keypair.fromSignature('0xSIGNATURE');
-```
+`veil init` defaults to wallet-derived key generation. Use `--generate` for a random keypair instead.
 
 ---
 
-## 2. Register (build unsigned tx)
+## 2. Keypair and Status
 
-Registration is a one-time on-chain operation that links an address to a deposit key.
-
-### CLI
+Generate or inspect keys:
 
 ```bash
-# Build unsigned register payload
-DEPOSIT_KEY=0x... veil register --unsigned --address 0xOWNER
+veil init
+veil init --generate
+veil init --signature 0xSIGNATURE
+veil init --json
+veil keypair
+veil keypair --json
+```
 
-# Force update - checks chain state and changes the key only if already registered
+Check environment, wallet, registration, and relay state:
+
+```bash
+veil status
+veil status --json
+```
+
+`veil status` also shows:
+
+- derived wallet address
+- public ETH balance when available
+- whether `WALLET_KEY` is missing vs invalid
+- registration and relay status
+
+---
+
+## 3. Register and Deposit
+
+Register the current `DEPOSIT_KEY` on-chain:
+
+```bash
+veil register
+veil register --force
+veil register --json
+DEPOSIT_KEY=0x... veil register --unsigned --address 0xOWNER
 DEPOSIT_KEY=0x... veil register --unsigned --address 0xOWNER --force
 ```
 
-With `--unsigned --force`, the CLI checks on-chain registration state first. If the address is not registered yet, it returns a normal `register` payload instead of an invalid `changeDepositKey` payload.
+Important:
 
-Output:
+- `veil register --unsigned --force` checks chain state first.
+- If the address is already registered, it returns `changeDepositKey`.
+- If the address is not registered yet, it returns a normal `register` payload.
 
-```json
-{
-  "action": "register",
-  "to": "0x...",
-  "data": "0x...",
-  "value": "0",
-  "chainId": 8453
-}
-```
-
-### Programmatic
-
-```typescript
-import { buildRegisterTx, buildChangeDepositKeyTx } from '@veil-cash/sdk';
-
-const tx = buildRegisterTx(depositKey, '0xOWNER');
-// tx = { to, data }  — no value for register
-
-// To change an existing key:
-const changeTx = buildChangeDepositKeyTx(newDepositKey, '0xOWNER');
-```
-
-Add `value: '0'` and `chainId: 8453` when forwarding to a signer.
-
----
-
-## 3. Deposit (build unsigned tx)
-
-Deposits send ETH or USDC into the privacy pool. Minimum: 0.01 ETH / 10 USDC. The amount you specify is the **net** amount that lands in the pool; the 0.3% protocol fee is calculated on-chain and added automatically.
-
-### CLI
+Deposits treat the CLI amount as the **net** amount that lands in the pool. The `0.3%` protocol fee is calculated on-chain and added automatically.
 
 ```bash
-# ETH deposit — single payload (amount is net; fee added automatically)
+veil deposit ETH 0.1
+veil deposit USDC 100
+veil deposit ETH 0.1 --json
 DEPOSIT_KEY=0x... veil deposit ETH 0.1 --unsigned
-
-# USDC deposit — outputs array: [approve, deposit]
 DEPOSIT_KEY=0x... veil deposit USDC 100 --unsigned
 ```
 
-ETH output (single object):
+Minimums:
 
-```json
-{
-  "step": "deposit",
-  "to": "0x...",
-  "data": "0x...",
-  "value": "100000000000000000",
-  "chainId": 8453
-}
-```
+- ETH: `0.01`
+- USDC: `10`
 
-USDC output (array — submit in order):
+`--unsigned` notes:
 
-```json
-[
-  {
-    "step": "approve",
-    "to": "0x...",
-    "data": "0x...",
-    "value": "0",
-    "chainId": 8453
-  },
-  {
-    "step": "deposit",
-    "to": "0x...",
-    "data": "0x...",
-    "value": "0",
-    "chainId": 8453
-  }
-]
-```
-
-### Programmatic
-
-```typescript
-import {
-  buildDepositETHTx,
-  buildDepositUSDCTx,
-  buildApproveUSDCTx,
-} from '@veil-cash/sdk';
-
-// ETH
-const ethTx = buildDepositETHTx({ depositKey, amount: '0.1' });
-// ethTx = { to, data, value: 100000000000000000n }
-
-// USDC (two-step: approve then deposit)
-const approve = buildApproveUSDCTx({ amount: '100' });
-const usdcTx  = buildDepositUSDCTx({ depositKey, amount: '100' });
-```
-
-When forwarding programmatic results to a signer, serialize `value` as a **string** (wei) and add `chainId: 8453`.
+- ETH returns one payload.
+- USDC returns `[approve, deposit]`.
+- Payloads use `{ to, data, value, chainId }`.
 
 ---
 
-## 4. Unsigned payload format
+## 4. Balance Commands
 
-All `--unsigned` CLI output follows this shape, compatible with any signer that accepts arbitrary transactions:
+Combined view:
+
+```bash
+veil balance
+veil balance --pool eth
+veil balance --pool usdc
+veil balance --json
+```
+
+Queue only:
+
+```bash
+veil balance queue
+veil balance queue --pool usdc
+veil balance queue --address 0x... --json
+```
+
+Private only:
+
+```bash
+veil balance private
+veil balance private --pool usdc --show-utxos
+veil balance private --json
+```
+
+Human-readable balance output now includes:
+
+- wallet public balances (`ETH`, `USDC`)
+- queue and private balances
+- optional UTXO details only when explicitly requested
+
+---
+
+## 5. Private Actions
+
+Withdraw from the private pool to a public address:
+
+```bash
+veil withdraw ETH 0.05 0xRecipientAddress
+veil withdraw USDC 50 0xRecipientAddress
+veil withdraw ETH 0.05 0xRecipientAddress --json
+```
+
+Transfer privately to another registered address:
+
+```bash
+veil transfer ETH 0.02 0xRecipientAddress
+veil transfer USDC 25 0xRecipientAddress
+veil transfer ETH 0.02 0xRecipientAddress --json
+```
+
+Merge UTXOs:
+
+```bash
+veil merge ETH 0.1
+veil merge USDC 100
+veil merge ETH 0.1 --json
+```
+
+Human-readable transaction output uses Basescan links instead of raw hashes.
+
+Operational note:
+
+- Withdraw proof generation is forced single-threaded for reliable CLI exit after success.
+
+---
+
+## 6. Unsigned payloads
+
+`--unsigned` is for signer workflows. The CLI emits signer-compatible payloads and does not send the transaction.
+
+Shape:
 
 ```json
 {
@@ -220,47 +237,24 @@ All `--unsigned` CLI output follows this shape, compatible with any signer that 
 }
 ```
 
-| Field | Type | Required | Notes |
-|-------|------|----------|-------|
-| `to` | string | yes | Target contract (0x + 40 hex chars) |
-| `data` | string | yes | Encoded calldata (0x + hex) |
-| `value` | string | yes | Wei as string (`"0"` or `"100000000000000000"`) |
-| `chainId` | number | yes | 8453 (Base mainnet) |
+Extra context fields may appear:
 
-`value` must be a **string**, never a number or bigint.
+- register: `action`
+- deposit: `step`
+
+Use `skills/veil/reference.md` for the lower-level payload details.
 
 ---
 
-## 5. Submit to signer
+## 7. Security
 
-The SDK does **not** sign or submit transactions. Hand the unsigned payload to your signer:
-
-1. **External wallet/MPC** — send the payload via your wallet SDK (viem, ethers, etc.)
-2. **Agent framework** — forward the JSON to your agent's arbitrary-transaction endpoint
-3. **Custodial API** — POST the payload to your custodial signer
-
-After submission, poll the signer or chain for the transaction hash and report the result.
-
----
-
-## 6. Security
-
-- Store `VEIL_KEY` and `DEPOSIT_KEY` in a secure file (e.g. `.env.veil`), mode `0600`.
+- Store `VEIL_KEY` and `DEPOSIT_KEY` in `.env.veil`.
+- Store `WALLET_KEY` in `.env` or the shell environment.
+- Never pass sensitive wallet keys on the CLI.
 - Never commit secrets to source control.
-- The deposit key is public (registered on-chain); the private key (`VEIL_KEY`) is secret.
-- All on-chain actions should require explicit user confirmation.
-
----
-
-## 7. Supported assets
-
-| Asset | Decimals | Pool |
-|-------|----------|------|
-| ETH | 18 | Native ETH (via WETH) |
-| USDC | 6 | `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` |
 
 ---
 
 ## Additional resources
 
-For the full payload spec and SDK function signatures, see [reference.md](reference.md).
+For exact payload shapes and lower-level details, see [reference.md](reference.md).
