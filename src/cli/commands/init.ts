@@ -101,9 +101,12 @@ function saveVeilKeypair(veilKey: string, depositKey: string, envPath: string): 
 function resolveWalletKey(): `0x${string}` {
   const raw = process.env.WALLET_KEY;
   if (!raw) {
+    const hasExternalSigner = Boolean(process.env.SIGNER_ADDRESS);
     throw new CLIError(
       ErrorCode.WALLET_KEY_MISSING,
-      'WALLET_KEY env var required. Set it or use --generate for a random keypair.',
+      hasExternalSigner
+        ? 'WALLET_KEY env var required for wallet-derived init. If you are using an external signer, use "veil init --signature 0x..." or use --generate for a random keypair.'
+        : 'WALLET_KEY env var required. Set it or use --generate for a random keypair.',
     );
   }
   const key = raw.startsWith('0x') ? raw : `0x${raw}`;
