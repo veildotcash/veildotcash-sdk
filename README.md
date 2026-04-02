@@ -55,7 +55,7 @@ veil deposit USDC 100
 veil balance
 veil balance --pool eth
 veil balance queue --pool usdc
-veil balance private --show-utxos
+veil balance private
 
 # 7. Use privacy actions
 veil withdraw ETH 0.05 0xRecipientAddress
@@ -144,7 +144,7 @@ Inspect private balances directly:
 
 ```bash
 veil balance private
-veil balance private --pool usdc --show-utxos
+veil balance private --pool usdc
 veil balance private --json
 ```
 

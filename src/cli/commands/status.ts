@@ -56,13 +56,10 @@ interface StatusResult {
 export function createStatusCommand(): Command {
   const status = new Command('status')
     .description('Check configuration and service status')
-    .option('--rpc-url <url>', 'RPC URL (or set RPC_URL env)')
-    .option('--relay-url <url>', 'Relay URL (or set RELAY_URL env)')
     .option('--json', 'Output as JSON')
     .addHelpText('after', `
 Examples:
   veil status
-  veil status --relay-url https://relay.example
   veil status --json
 `)
     .action(async (options) => {
@@ -121,7 +118,7 @@ Examples:
         }
 
         // Check RPC_URL
-        const rpcUrl = options.rpcUrl || process.env.RPC_URL;
+        const rpcUrl = process.env.RPC_URL;
         if (rpcUrl) {
           result.rpcUrl.found = true;
           result.rpcUrl.url = rpcUrl;
@@ -167,7 +164,7 @@ Examples:
         }
 
         // Check relay health
-        const relayUrl = options.relayUrl || process.env.RELAY_URL;
+        const relayUrl = process.env.RELAY_URL;
         result.relay.checked = true;
         try {
           const health = await checkRelayHealth(relayUrl);

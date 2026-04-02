@@ -13,7 +13,6 @@ export function createRegisterCommand(): Command {
   const register = new Command('register')
     .description('Register or update your deposit key on-chain')
     .option('--address <address>', 'Signer address (optional if SIGNER_ADDRESS or WALLET_KEY is set in --unsigned mode)')
-    .option('--rpc-url <url>', 'RPC URL (or set RPC_URL env)')
     .option('--unsigned', 'Output unsigned transaction payload instead of sending')
     .option('--force', 'Change deposit key even if already registered')
     .option('--json', 'Output as JSON')
@@ -46,7 +45,7 @@ Examples:
           }
           const address = resolvedAddress.address;
 
-          const rpcUrl = options.rpcUrl || process.env.RPC_URL;
+          const rpcUrl = process.env.RPC_URL;
           const isChange = options.force
             ? (await isRegistered(address, rpcUrl)).registered
             : false;

@@ -30,7 +30,6 @@ export function createQueueBalanceCommand(name = 'queue-balance'): Command {
     .description('Show queue balance and pending deposits')
     .option('--pool <pool>', 'Pool to check (eth or usdc)', 'eth')
     .option('--address <address>', 'Address to check (or derived from WALLET_KEY / SIGNER_ADDRESS)')
-    .option('--rpc-url <url>', 'RPC URL (or set RPC_URL env)')
     .option('--json', 'Output as JSON')
     .addHelpText('after', `
 Examples:
@@ -54,7 +53,7 @@ Examples:
         }
         const address = resolvedAddress.address;
 
-        const rpcUrl = options.rpcUrl || process.env.RPC_URL;
+        const rpcUrl = process.env.RPC_URL;
         const onProgress = createProgressReporter();
         const result = await getQueueBalance({ address, pool, rpcUrl, onProgress });
         clearProgress();

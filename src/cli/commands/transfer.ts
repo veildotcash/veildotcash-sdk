@@ -17,8 +17,6 @@ export function createTransferCommand(): Command {
     .argument('<asset>', 'Asset to transfer (ETH or USDC)')
     .argument('<amount>', 'Amount to transfer (e.g., 0.1)')
     .argument('<recipient>', 'Recipient address (must be registered)')
-    .option('--veil-key <key>', 'Veil private key (or set VEIL_KEY env)')
-    .option('--rpc-url <url>', 'RPC URL (or set RPC_URL env)')
     .option('--json', 'Output as JSON')
     .addHelpText('after', `
 Examples:
@@ -41,13 +39,13 @@ Examples:
         }
 
         // Get keypair
-        const veilKey = options.veilKey || process.env.VEIL_KEY;
+        const veilKey = process.env.VEIL_KEY;
         if (!veilKey) {
-          throw new CLIError(ErrorCode.VEIL_KEY_MISSING, 'VEIL_KEY required. Use --veil-key or set VEIL_KEY env');
+          throw new CLIError(ErrorCode.VEIL_KEY_MISSING, 'VEIL_KEY required. Set VEIL_KEY env');
         }
 
         const senderKeypair = new Keypair(veilKey);
-        const rpcUrl = options.rpcUrl || process.env.RPC_URL;
+        const rpcUrl = process.env.RPC_URL;
         const pool = assetUpper.toLowerCase() as RelayPool;
         const onProgress = createProgressReporter();
         onProgress(`Starting ${assetUpper} transfer...`);
@@ -102,8 +100,6 @@ export function createMergeCommand(): Command {
     .description('Merge UTXOs by self-transfer (consolidate small UTXOs)')
     .argument('<asset>', 'Asset to merge (ETH or USDC)')
     .argument('<amount>', 'Amount to merge (e.g., 0.5)')
-    .option('--veil-key <key>', 'Veil private key (or set VEIL_KEY env)')
-    .option('--rpc-url <url>', 'RPC URL (or set RPC_URL env)')
     .option('--json', 'Output as JSON')
     .addHelpText('after', `
 Examples:
@@ -121,13 +117,13 @@ Examples:
         }
 
         // Get keypair
-        const veilKey = options.veilKey || process.env.VEIL_KEY;
+        const veilKey = process.env.VEIL_KEY;
         if (!veilKey) {
-          throw new CLIError(ErrorCode.VEIL_KEY_MISSING, 'VEIL_KEY required. Use --veil-key or set VEIL_KEY env');
+          throw new CLIError(ErrorCode.VEIL_KEY_MISSING, 'VEIL_KEY required. Set VEIL_KEY env');
         }
 
         const keypair = new Keypair(veilKey);
-        const rpcUrl = options.rpcUrl || process.env.RPC_URL;
+        const rpcUrl = process.env.RPC_URL;
         const pool = assetUpper.toLowerCase() as RelayPool;
         const onProgress = createProgressReporter();
         onProgress(`Starting ${assetUpper} merge (self-transfer)...`);

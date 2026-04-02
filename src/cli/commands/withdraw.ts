@@ -17,8 +17,6 @@ export function createWithdrawCommand(): Command {
     .argument('<asset>', 'Asset to withdraw (ETH or USDC)')
     .argument('<amount>', 'Amount to withdraw (e.g., 0.1)')
     .argument('<recipient>', 'Recipient address (e.g., 0x...)')
-    .option('--veil-key <key>', 'Veil private key (or set VEIL_KEY env)')
-    .option('--rpc-url <url>', 'RPC URL (or set RPC_URL env)')
     .option('--json', 'Output as JSON')
     .addHelpText('after', `
 Examples:
@@ -41,13 +39,13 @@ Examples:
         }
 
         // Get keypair
-        const veilKey = options.veilKey || process.env.VEIL_KEY;
+        const veilKey = process.env.VEIL_KEY;
         if (!veilKey) {
-          throw new CLIError(ErrorCode.VEIL_KEY_MISSING, 'VEIL_KEY required. Use --veil-key or set VEIL_KEY env');
+          throw new CLIError(ErrorCode.VEIL_KEY_MISSING, 'VEIL_KEY required. Set VEIL_KEY env');
         }
 
         const keypair = new Keypair(veilKey);
-        const rpcUrl = options.rpcUrl || process.env.RPC_URL;
+        const rpcUrl = process.env.RPC_URL;
         const pool = assetUpper.toLowerCase() as RelayPool;
         const onProgress = createProgressReporter();
         onProgress(`Starting ${assetUpper} withdrawal...`);

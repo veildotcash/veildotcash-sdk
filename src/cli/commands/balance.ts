@@ -94,15 +94,12 @@ export function createBalanceCommand(): Command {
     .description('Show queue and private balances (all pools by default)')
     .option('--pool <pool>', 'Pool to check (eth, usdc, or all)', 'all')
     .option('--address <address>', 'Address to check (or derived from WALLET_KEY / SIGNER_ADDRESS)')
-    .option('--veil-key <key>', 'Veil private key (or set VEIL_KEY env)')
-    .option('--rpc-url <url>', 'RPC URL (or set RPC_URL env)')
     .option('--json', 'Output as JSON')
     .addHelpText('after', `
 Examples:
   veil balance
   veil balance --pool eth
   veil balance queue --pool usdc
-  veil balance private --show-utxos
   veil balance --json
 `)
     .action(async (options) => {
@@ -127,10 +124,10 @@ Examples:
         const address = resolvedAddress.address;
 
         // Get keypair for private balance
-        const veilKey = options.veilKey || process.env.VEIL_KEY;
+        const veilKey = process.env.VEIL_KEY;
         const keypair = veilKey ? new Keypair(veilKey) : null;
 
-        const rpcUrl = options.rpcUrl || process.env.RPC_URL;
+        const rpcUrl = process.env.RPC_URL;
 
         const onProgress = createProgressReporter();
 

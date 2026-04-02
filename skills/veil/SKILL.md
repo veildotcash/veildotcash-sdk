@@ -207,7 +207,7 @@ Private only:
 
 ```bash
 veil balance private
-veil balance private --pool usdc --show-utxos
+veil balance private --pool usdc
 veil balance private --json
 ```
 
@@ -215,7 +215,6 @@ Human-readable balance output now includes:
 
 - wallet public balances (`ETH`, `USDC`)
 - queue and private balances
-- optional UTXO details only when explicitly requested
 
 ---
 

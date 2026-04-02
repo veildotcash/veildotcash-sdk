@@ -49,7 +49,6 @@ export function createDepositCommand(): Command {
     .description('Deposit ETH or USDC into Veil')
     .argument('<asset>', 'Asset to deposit (ETH or USDC)')
     .argument('<amount>', 'Amount to deposit — this is what arrives in your Veil balance')
-    .option('--rpc-url <url>', 'RPC URL (or set RPC_URL env)')
     .option('--unsigned', 'Output unsigned transaction payload instead of sending')
     .option('--json', 'Output as JSON')
     .addHelpText('after', `
@@ -80,7 +79,7 @@ Examples:
           );
         }
 
-        const rpcUrl = options.rpcUrl || process.env.RPC_URL;
+        const rpcUrl = process.env.RPC_URL;
         const poolConfig = POOL_CONFIG[assetUpper.toLowerCase() as 'eth' | 'usdc'];
         const netWei = assetUpper === 'ETH'
           ? parseEther(amount)
