@@ -14,16 +14,16 @@ export function createRegisterCommand(): Command {
     .description('Register or update your deposit key on-chain')
     .option('--address <address>', 'Signer address (optional if SIGNER_ADDRESS or WALLET_KEY is set in --unsigned mode)')
     .option('--unsigned', 'Output unsigned transaction payload instead of sending')
-    .option('--force', 'Change deposit key even if already registered')
-    .option('--json', 'Output as JSON')
-    .addHelpText('after', `
-Examples:
-  veil register
-  veil register --force
-  veil register --unsigned --address 0x...
-  SIGNER_ADDRESS=0x... veil register --unsigned
-  veil register --json
-`)
+     .option('--force', 'Change deposit key even if already registered')
+     .option('--json', 'Output as JSON')
+     .addHelpText('after', `
+ Examples:
+   veil register
+   veil register --force
+   veil register --unsigned --address 0x...
+   SIGNER_ADDRESS=0x... veil register --unsigned
+   veil register --json
+ `)
     .action(async (options) => {
       const jsonOutput = options.json;
 

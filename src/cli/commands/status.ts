@@ -181,19 +181,21 @@ Examples:
           return;
         }
 
+        const signingValue = result.signerAddress.found
+          ? result.signerAddress.valid === false
+            ? 'external (SIGNER_ADDRESS invalid)'
+            : 'external (SIGNER_ADDRESS)'
+          : result.walletKey.found
+            ? result.walletKey.valid === false
+              ? 'local (WALLET_KEY invalid)'
+              : 'local (WALLET_KEY)'
+            : 'not configured';
+
         printHeader('Veil CLI Status');
         printSection('Configuration');
         printFields([
-          {
-            label: 'Wallet key',
-            value: !result.walletKey.found
-              ? 'missing'
-              : result.walletKey.valid === false
-                ? 'invalid'
-                : 'configured'
-          },
-          { label: 'Mode', value: result.resolvedAddress.source || 'n/a' },
-          { label: 'Wallet address', value: result.resolvedAddress.address || 'n/a' },
+          { label: 'Signing', value: signingValue },
+          { label: 'Address', value: result.resolvedAddress.address || 'n/a' },
           { label: 'ETH balance', value: result.walletKey.ethBalance ? `${result.walletKey.ethBalance} ETH` : 'n/a' },
           { label: 'Veil key', value: result.veilKey.found ? 'configured' : 'missing' },
           { label: 'Deposit key', value: result.depositKey.found ? maskValue(result.depositKey.key || '') : 'missing' },
