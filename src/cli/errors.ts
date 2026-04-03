@@ -9,6 +9,7 @@ export const ErrorCode = {
   VEIL_KEY_MISSING: 'VEIL_KEY_MISSING',
   WALLET_KEY_MISSING: 'WALLET_KEY_MISSING',
   DEPOSIT_KEY_MISSING: 'DEPOSIT_KEY_MISSING',
+  CONFIG_CONFLICT: 'CONFIG_CONFLICT',
   INVALID_ADDRESS: 'INVALID_ADDRESS',
   INVALID_AMOUNT: 'INVALID_AMOUNT',
   INSUFFICIENT_BALANCE: 'INSUFFICIENT_BALANCE',
@@ -50,6 +51,9 @@ function inferErrorCode(message: string): ErrorCodeType {
   }
   if (msg.includes('deposit_key') || msg.includes('deposit key')) {
     return ErrorCode.DEPOSIT_KEY_MISSING;
+  }
+  if (msg.includes('mutually exclusive') || msg.includes('config conflict') || msg.includes('signer_address')) {
+    return ErrorCode.CONFIG_CONFLICT;
   }
   if (msg.includes('invalid') && msg.includes('address')) {
     return ErrorCode.INVALID_ADDRESS;

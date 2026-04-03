@@ -49,7 +49,9 @@ export function getAddresses(): NetworkAddresses {
  * @param pool - Pool identifier ('eth' or 'usdc')
  * @returns Pool contract address
  */
-export function getPoolAddress(pool: RelayPool): `0x${string}` {
+export function getPoolAddress(
+  pool: RelayPool
+): `0x${string}` {
   const addresses = getAddresses();
   switch (pool) {
     case 'eth': return addresses.ethPool;
@@ -63,7 +65,9 @@ export function getPoolAddress(pool: RelayPool): `0x${string}` {
  * @param pool - Pool identifier ('eth' or 'usdc')
  * @returns Queue contract address
  */
-export function getQueueAddress(pool: RelayPool): `0x${string}` {
+export function getQueueAddress(
+  pool: RelayPool
+): `0x${string}` {
   const addresses = getAddresses();
   switch (pool) {
     case 'eth': return addresses.ethQueue;

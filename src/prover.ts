@@ -133,6 +133,9 @@ export async function prove(input: ProofInput, circuitName: string): Promise<str
     utils.stringifyBigInts(input) as any,
     wasmPath,
     zkeyPath,
+    undefined,
+    undefined,
+    { singleThread: true },
   );
   const proof = result.proof as unknown as SnarkProof;
 

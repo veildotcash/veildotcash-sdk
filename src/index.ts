@@ -116,7 +116,12 @@ export {
 } from './relay.js';
 
 // ABIs
-export { ENTRY_ABI, ERC20_ABI, QUEUE_ABI, POOL_ABI } from './abi.js';
+export {
+  ENTRY_ABI,
+  ERC20_ABI,
+  QUEUE_ABI,
+  POOL_ABI,
+} from './abi.js';
 
 // Utilities
 export { 

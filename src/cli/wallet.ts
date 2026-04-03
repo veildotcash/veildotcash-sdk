@@ -9,12 +9,13 @@ import {
   decodeErrorResult,
   BaseError,
   ContractFunctionRevertedError,
+  formatUnits,
 } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { base } from 'viem/chains';
 import type { TransactionData } from '../types.js';
-import { ENTRY_ABI } from '../abi.js';
-import { getAddresses } from '../addresses.js';
+import { ENTRY_ABI, ERC20_ABI } from '../abi.js';
+import { getAddresses, POOL_CONFIG, ADDRESSES } from '../addresses.js';
 
 export interface WalletConfig {
   privateKey: `0x${string}`;
@@ -63,14 +64,25 @@ export function createWallet(config: WalletConfig): any {
  * Known custom error selectors (first 4 bytes of keccak256 hash of error signature)
  */
 const ERROR_SELECTORS: Record<string, string> = {
+  '0xd92e233d': 'ZeroAddress',
+  '0xe9e26e4e': 'OnlyOwnerCanRegister',
+  '0x1f2a2005': 'ZeroAmount',
   '0x3ee5aeb5': 'DepositsDisabled',
+  '0x4cba3441': 'InvalidDepositKey',
+  '0xc64891a5': 'NotRelayer',
+  '0xfcc00b30': 'NoETHBalance',
+  '0x7b7b36da': 'NoTokenBalance',
+  '0x7ffddb78': 'TokenApproveFailed',
+  '0xb12d13eb': 'ETHTransferFailed',
+  '0x1f6d5aef': 'NonceUsed',
+  '0x82b42900': 'Unauthorized',
+  '0x1ab7da6b': 'DeadlineExpired',
   '0x8e8f6d6f': 'MinimumDepositNotMet',
   '0x5cd83192': 'NotAllowedToDeposit',
   '0x6f5e8818': 'UserNotRegistered',
   '0x8a2ef116': 'UserAlreadyRegistered',
   '0x0dc149f0': 'InvalidDepositKey',
   '0x584a7938': 'InvalidDepositKeyForUser',
-  '0xd92e233d': 'OnlyOwnerCanRegister',
 };
 
 /**
@@ -106,11 +118,17 @@ function decodeCustomError(error: unknown): string | null {
     
     if (possibleData && typeof possibleData === 'string' && possibleData.startsWith('0x')) {
       try {
-        const decoded = decodeErrorResult({
-          abi: ENTRY_ABI,
-          data: possibleData as `0x${string}`,
-        });
-        return decoded.errorName;
+        for (const abi of [ENTRY_ABI] as const) {
+          try {
+            const decoded = decodeErrorResult({
+              abi,
+              data: possibleData as `0x${string}`,
+            });
+            return decoded.errorName;
+          } catch {
+            // Try the next ABI
+          }
+        }
       } catch {
         // Try selector lookup
         const selector = possibleData.slice(0, 10).toLowerCase();
@@ -151,16 +169,26 @@ export async function sendTransaction(
   }
 
   // Send the transaction
-  const hash = await walletClient.sendTransaction({
-    account,
-    chain,
-    to: tx.to,
-    data: tx.data,
-    value: tx.value,
-  });
+  let hash: `0x${string}`;
+  try {
+    hash = await walletClient.sendTransaction({
+      account,
+      chain,
+      to: tx.to,
+      data: tx.data,
+      value: tx.value,
+    });
+  } catch (error) {
+    throw error;
+  }
 
   // Wait for confirmation
-  const receipt = await publicClient.waitForTransactionReceipt({ hash });
+  let receipt;
+  try {
+    receipt = await publicClient.waitForTransactionReceipt({ hash });
+  } catch (error) {
+    throw error;
+  }
 
   return {
     hash,
@@ -194,6 +222,37 @@ export async function getBalance(
   });
 
   return publicClient.getBalance({ address });
+}
+
+/**
+ * Get public wallet balances (ETH + USDC) for an address
+ */
+export async function getWalletBalances(
+  address: `0x${string}`,
+  rpcUrl?: string
+): Promise<{ eth: string; ethWei: string; usdc: string; usdcWei: string }> {
+  const transport = http(rpcUrl);
+  const publicClient = createPublicClient({
+    chain: base,
+    transport,
+  });
+
+  const [ethBalance, usdcBalance] = await Promise.all([
+    publicClient.getBalance({ address }),
+    publicClient.readContract({
+      address: ADDRESSES.usdcToken as `0x${string}`,
+      abi: ERC20_ABI,
+      functionName: 'balanceOf',
+      args: [address],
+    }) as Promise<bigint>,
+  ]);
+
+  return {
+    eth: formatUnits(ethBalance, POOL_CONFIG.eth.decimals),
+    ethWei: ethBalance.toString(),
+    usdc: formatUnits(usdcBalance, POOL_CONFIG.usdc.decimals),
+    usdcWei: usdcBalance.toString(),
+  };
 }
 
 /**

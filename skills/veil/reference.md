@@ -37,6 +37,7 @@ The CLI may include an `action` or `step` field for context:
 - **Deposit**: `"step": "approve"` (USDC only) and `"step": "deposit"`
 
 These fields are informational and can be ignored by the signer.
+For `veil register --unsigned --force`, the CLI checks chain state first and chooses `"register"` vs `"changeDepositKey"` based on whether the address is already registered.
 
 ---
 
@@ -81,11 +82,11 @@ import { buildRegisterTx, buildChangeDepositKeyTx } from '@veil-cash/sdk';
 import type { TransactionData } from '@veil-cash/sdk';
 
 // First-time registration
-const tx: TransactionData = buildRegisterTx(depositKey, '0xOWNER_ADDRESS');
+const tx: TransactionData = buildRegisterTx(depositKey, '0xSIGNER_ADDRESS');
 // tx = { to: '0x...', data: '0x...' }
 
 // Update existing deposit key
-const changeTx: TransactionData = buildChangeDepositKeyTx(newDepositKey, '0xOWNER_ADDRESS');
+const changeTx: TransactionData = buildChangeDepositKeyTx(newDepositKey, '0xSIGNER_ADDRESS');
 ```
 
 `TransactionData` type:
@@ -130,10 +131,16 @@ When serializing for a signer: `value` must be converted to a string (`tx.value?
 import { getQueueBalance, getPrivateBalance } from '@veil-cash/sdk';
 
 // Queue balance (pending deposits)
-const queue = await getQueueBalance(depositKey, 'eth');
+const queue = await getQueueBalance({
+  address: '0x...',
+  pool: 'eth',
+});
 
 // Private balance (in-pool UTXOs)
-const priv = await getPrivateBalance(keypair, 'eth');
+const priv = await getPrivateBalance({
+  keypair,
+  pool: 'eth',
+});
 ```
 
 ---
@@ -149,29 +156,45 @@ Install globally: `npm install -g @veil-cash/sdk`
 | `VEIL_KEY` | Veil private key (for ZK proofs) |
 | `DEPOSIT_KEY` | Veil deposit key (public) |
 | `WALLET_KEY` | Ethereum wallet private key (for signing) |
+| `SIGNER_ADDRESS` | Ethereum address for unsigned/query flows when signing is external |
 | `RPC_URL` | Base RPC URL (optional, defaults to public RPC) |
+| `RELAY_URL` | Override relay base URL for relayed CLI operations |
+
+`WALLET_KEY` and `SIGNER_ADDRESS` are mutually exclusive. Use `SIGNER_ADDRESS` only for address-only CLI flows.
 
 ### Commands
 
 ```bash
-veil init --json                                   # Generate random keypair as JSON
-veil init --json --no-save                         # Generate without saving to disk
-veil init --sign-message --wallet-key 0x...        # Derive from wallet
-veil init --signature 0x...                        # Derive from signature
+veil init                                          # Derive keypair from WALLET_KEY (saves to .env.veil)
+veil init --generate                               # Generate random keypair
+veil init --signature 0x...                        # Derive from pre-computed EIP-191 signature
+veil init --force                                  # Overwrite existing keypair without prompting
+veil init --no-save                                # Print keypair without saving to disk
+veil init --json                                   # Output keypair as JSON (no prompts, no file save)
 
-veil keypair                                       # Show current keypair as JSON
+veil keypair                                       # Show current keypair (from VEIL_KEY)
+veil keypair --json                                # Show current keypair as JSON
 
-veil register --unsigned --address 0x...           # Unsigned register payload
-veil register --unsigned --address 0x... --force   # Unsigned change-key payload
+veil status                                        # Check config, signing mode, registration, and relay health
+veil status --json                                 # Machine-readable status
+
+SIGNER_ADDRESS=0x... veil register --unsigned       # Unsigned register payload
+SIGNER_ADDRESS=0x... veil register --unsigned --force # Unsigned register/change-key payload (depends on chain state)
+veil register --unsigned --address 0x...           # Unsigned register payload (explicit address)
+veil register --json                               # Register and output result as JSON
 
 veil deposit ETH 0.1 --unsigned                    # Unsigned ETH deposit payload
 veil deposit USDC 100 --unsigned                   # Unsigned USDC deposit payload(s)
+veil deposit ETH 0.1 --json                        # Deposit and output result as JSON
 
 veil balance                                       # All pool balances
 veil balance --pool eth                            # ETH pool only
 veil balance --pool usdc                           # USDC pool only
-
-veil status                                        # Check config and service health
+veil balance --json                                # Machine-readable balances
+veil balance queue --pool eth                      # Queue-only balance
+veil balance queue --address 0x... --json          # Queue balance for explicit address
+veil balance private --pool eth                    # Private-only balance
+veil balance private --json                        # Private balance as JSON
 ```
 
 ### Error format
@@ -182,21 +205,23 @@ All CLI errors output JSON with a standardized `errorCode`:
 {
   "success": false,
   "errorCode": "VEIL_KEY_MISSING",
-  "error": "VEIL_KEY required. Use --veil-key or set VEIL_KEY env"
+  "error": "VEIL_KEY required. Set VEIL_KEY env"
 }
 ```
 
 Common codes: `VEIL_KEY_MISSING`, `WALLET_KEY_MISSING`, `DEPOSIT_KEY_MISSING`,
-`INVALID_AMOUNT`, `INSUFFICIENT_BALANCE`, `CONTRACT_ERROR`, `NETWORK_ERROR`.
+`CONFIG_CONFLICT`, `INVALID_AMOUNT`, `INSUFFICIENT_BALANCE`, `CONTRACT_ERROR`, `RPC_ERROR`.
 
 ---
 
 ## Deposit minimums
 
-| Asset | Minimum (net) | With 0.3% fee |
-|-------|--------------|----------------|
-| ETH | 0.01 | ~0.01003 |
-| USDC | 10 | ~10.03 |
+| Asset | Minimum (net) | Notes |
+|-------|--------------|-------|
+| ETH | 0.01 | Fee (0.3%) added automatically via on-chain `getDepositAmountWithFee` |
+| USDC | 10 | Fee (0.3%) added automatically via on-chain `getDepositAmountWithFee` |
+
+The CLI amount is the **net** amount that lands in the pool. The fee is calculated on-chain and added to the transaction automatically — users do not need to account for it.
 
 ---
 

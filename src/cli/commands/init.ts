@@ -8,6 +8,8 @@ import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { dirname } from 'path';
 import { mkdirSync } from 'fs';
 import { Keypair } from '../../keypair.js';
+import { handleCLIError, CLIError, ErrorCode } from '../errors.js';
+import { printFields, printHeader, printJson, printLine } from '../output.js';
 
 /**
  * Prompt user for yes/no confirmation
@@ -31,6 +33,18 @@ async function confirm(question: string): Promise<boolean> {
  */
 function getDefaultEnvPath(): string {
   return '.env.veil';
+}
+
+/**
+ * Enforce mutually exclusive wallet env modes.
+ */
+function ensureAddressEnvConsistency(): void {
+  if (process.env.WALLET_KEY && process.env.SIGNER_ADDRESS) {
+    throw new CLIError(
+      ErrorCode.CONFIG_CONFLICT,
+      'WALLET_KEY and SIGNER_ADDRESS are mutually exclusive. Set only one.',
+    );
+  }
 }
 
 /**
@@ -62,7 +76,6 @@ function updateEnvVar(content: string, key: string, value: string): string {
  * Save Veil keypair to a file
  */
 function saveVeilKeypair(veilKey: string, depositKey: string, envPath: string): void {
-  // Ensure directory exists
   const dir = dirname(envPath);
   if (dir && dir !== '.' && !existsSync(dir)) {
     mkdirSync(dir, { recursive: true });
@@ -85,106 +98,116 @@ function saveVeilKeypair(veilKey: string, depositKey: string, envPath: string): 
 /**
  * Resolve wallet key from CLI flag or WALLET_KEY env var
  */
-function resolveWalletKey(options: { walletKey?: string }): `0x${string}` {
-  const raw = options.walletKey || process.env.WALLET_KEY;
+function resolveWalletKey(): `0x${string}` {
+  const raw = process.env.WALLET_KEY;
   if (!raw) {
-    throw new Error('Wallet key required for --sign-message. Use --wallet-key <key> or set WALLET_KEY env var.');
+    const hasExternalSigner = Boolean(process.env.SIGNER_ADDRESS);
+    throw new CLIError(
+      ErrorCode.WALLET_KEY_MISSING,
+      hasExternalSigner
+        ? 'WALLET_KEY env var required for wallet-derived init. If you are using an external signer, use "veil init --signature 0x..." or use --generate for a random keypair.'
+        : 'WALLET_KEY env var required. Set it or use --generate for a random keypair.',
+    );
   }
   const key = raw.startsWith('0x') ? raw : `0x${raw}`;
   if (key.length !== 66) {
-    throw new Error('Invalid wallet key format. Must be a 0x-prefixed 64-character hex string.');
+    throw new CLIError(ErrorCode.WALLET_KEY_MISSING, 'Invalid WALLET_KEY format. Must be a 0x-prefixed 64-character hex string.');
   }
   return key as `0x${string}`;
 }
 
 export function createInitCommand(): Command {
   const init = new Command('init')
-    .description('Generate a new Veil keypair')
+    .description('Derive a Veil keypair from your wallet (or generate a random one)')
+    .option('--generate', 'Generate a random keypair instead of deriving from wallet')
+    .option('--signature <sig>', 'Derive keypair from a pre-computed EIP-191 personal_sign signature')
     .option('--force', 'Overwrite existing keypair without prompting')
     .option('--json', 'Output as JSON (no prompts, no file save)')
     .option('--no-save', 'Print keypair without saving to file')
-    .option('--sign-message', 'Derive keypair from wallet signature (same as frontend login)')
-    .option('--wallet-key <key>', 'Ethereum wallet private key (or set WALLET_KEY env var)')
-    .option('--signature <sig>', 'Derive keypair from a pre-computed EIP-191 personal_sign signature')
+    .addHelpText('after', `
+Examples:
+  veil init                           Derive from WALLET_KEY (default)
+  veil init --generate                Generate a random keypair
+  veil init --signature 0x...         Derive from a pre-computed signature
+  veil init --json                    Output keypair as JSON
+`)
     .action(async (options) => {
-      const envPath = getDefaultEnvPath();
-      
-      /**
-       * Create keypair: derived from wallet, from signature, or random
-       */
-      async function createKp(): Promise<Keypair> {
-        if (options.signMessage) {
-          const walletKey = resolveWalletKey(options);
+      try {
+        ensureAddressEnvConsistency();
+        const envPath = getDefaultEnvPath();
+        const useRandom = options.generate;
+        const useSignature = options.signature;
+
+        async function createKp(): Promise<Keypair> {
+          if (useSignature) {
+            return Keypair.fromSignature(options.signature);
+          }
+          if (useRandom) {
+            return new Keypair();
+          }
+          const walletKey = resolveWalletKey();
           return Keypair.fromWalletKey(walletKey);
         }
-        if (options.signature) {
-          return Keypair.fromSignature(options.signature);
-        }
-        return new Keypair();
-      }
 
-      const derivation: 'wallet-signature' | 'provided-signature' | 'random' =
-        options.signMessage ? 'wallet-signature'
-        : options.signature ? 'provided-signature'
-        : 'random';
+        const derivation: 'wallet-signature' | 'provided-signature' | 'random' =
+          useSignature ? 'provided-signature'
+          : useRandom ? 'random'
+          : 'wallet-signature';
 
-      const derivationLabel = options.signMessage
-        ? 'Derived Veil keypair from wallet signature'
-        : options.signature
-          ? 'Derived Veil keypair from provided signature'
-          : 'Generated new Veil keypair';
+        const derivationLabel =
+          useSignature ? 'Derived keypair from provided signature'
+          : useRandom ? 'Generated random keypair'
+          : 'Derived keypair from wallet signature';
 
-      // JSON mode: no prompts, no save, just output JSON
-      if (options.json) {
         const kp = await createKp();
-        console.log(JSON.stringify({
+        const result = {
           veilKey: kp.privkey,
           veilPrivateKey: kp.privkey,
           depositKey: kp.depositKey(),
           derivation,
-        }, null, 2));
-        process.exit(0);
-        return;
-      }
+        };
 
-      // No-save mode: print but don't save
-      if (!options.save) {
-        const kp = await createKp();
-        console.log(`\n${derivationLabel}:\n`);
-        console.log('Veil Private Key:');
-        console.log(`  ${kp.privkey}\n`);
-        console.log('Deposit Key (register this on-chain):');
-        console.log(`  ${kp.depositKey()}\n`);
-        console.log('(Not saved - run without --no-save to save to .env.veil)');
-        process.exit(0);
-        return;
-      }
-
-      // Check if VEIL_KEY already exists (unless --force)
-      const keyExists = veilKeyExistsAt(envPath);
-      
-      if (keyExists && !options.force) {
-        console.log(`\nWARNING: A Veil key already exists in ${envPath}`);
-        const proceed = await confirm('Create a new key? This will overwrite the existing one');
-        if (!proceed) {
-          console.log('Aborted. Existing key preserved.');
-          process.exit(0);
+        if (options.json) {
+          printJson(result);
           return;
         }
+
+        if (!options.save) {
+          printHeader(derivationLabel);
+          printFields([
+            { label: 'Veil private key', value: kp.privkey },
+            { label: 'Deposit key', value: kp.depositKey() },
+            { label: 'Saved', value: 'no' },
+          ]);
+          printLine();
+          printLine('Run `veil init` without `--no-save` to persist these keys to .env.veil.');
+          printLine();
+          return;
+        }
+
+        const keyExists = veilKeyExistsAt(envPath);
+        if (keyExists && !options.force) {
+          printLine(`WARNING: A Veil key already exists in ${envPath}`);
+          const proceed = await confirm('Create a new key? This will overwrite the existing one');
+          if (!proceed) {
+            printLine('Aborted. Existing key preserved.');
+            return;
+          }
+        }
+
+        saveVeilKeypair(kp.privkey!, kp.depositKey(), envPath);
+        printHeader(derivationLabel);
+        printFields([
+          { label: 'Veil private key', value: kp.privkey },
+          { label: 'Deposit key', value: kp.depositKey() },
+          { label: 'Saved to', value: envPath },
+        ]);
+        printLine();
+        printLine('Next step: veil register');
+        printLine();
+      } catch (error) {
+        handleCLIError(error);
       }
-      
-      const kp = await createKp();
-      
-      console.log(`\n${derivationLabel}:\n`);
-      console.log('Veil Private Key:');
-      console.log(`  ${kp.privkey}\n`);
-      console.log('Deposit Key (register this on-chain):');
-      console.log(`  ${kp.depositKey()}\n`);
-      
-      saveVeilKeypair(kp.privkey!, kp.depositKey(), envPath);
-      console.log(`Saved to ${envPath}`);
-      console.log('\nNext step: veil register');
-      process.exit(0);
     });
 
   return init;
