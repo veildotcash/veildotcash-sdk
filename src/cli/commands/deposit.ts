@@ -11,7 +11,7 @@ import { base } from 'viem/chains';
 import { handleCLIError, CLIError, ErrorCode } from '../errors.js';
 import { clearProgress, createProgressReporter, printFields, printHeader, printJson, printLine, txUrl } from '../output.js';
 import { POOL_CONFIG, getAddresses } from '../../addresses.js';
-import { ENTRY_ABI } from '../../abi.js';
+import { ENTRY_ABI, ERC20_ABI } from '../../abi.js';
 import type { TransactionData } from '../../types.js';
 
 const MINIMUM_NET: Record<string, number> = {
@@ -158,7 +158,38 @@ Examples:
 
         if (approveTx) {
           progress(`Approving ${assetUpper}...`);
-          await sendTransaction(config, approveTx);
+          const approvalResult = await sendTransaction(config, approveTx);
+          if (assetUpper === 'USDC') {
+            const publicClient = createPublicClient({
+              chain: base,
+              transport: http(config.rpcUrl),
+            });
+            const addresses = getAddresses();
+            let allowance = await publicClient.readContract({
+              address: getAddresses().usdcToken,
+              abi: ERC20_ABI,
+              functionName: 'allowance',
+              args: [address, addresses.entry],
+            }) as bigint;
+            for (let confirmations = 2; allowance < grossWei && confirmations <= 3; confirmations++) {
+              await publicClient.waitForTransactionReceipt({
+                hash: approvalResult.hash,
+                confirmations,
+              });
+              allowance = await publicClient.readContract({
+                address: addresses.usdcToken,
+                abi: ERC20_ABI,
+                functionName: 'allowance',
+                args: [address, addresses.entry],
+              }) as bigint;
+            }
+            if (allowance < grossWei) {
+              throw new CLIError(
+                ErrorCode.CONTRACT_ERROR,
+                `USDC approval is not yet visible on RPC after confirmation. Allowance ${allowance.toString()} < required ${grossWei.toString()}.`
+              );
+            }
+          }
         }
 
         progress('Sending deposit transaction...');

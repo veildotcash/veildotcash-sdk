@@ -169,16 +169,26 @@ export async function sendTransaction(
   }
 
   // Send the transaction
-  const hash = await walletClient.sendTransaction({
-    account,
-    chain,
-    to: tx.to,
-    data: tx.data,
-    value: tx.value,
-  });
+  let hash: `0x${string}`;
+  try {
+    hash = await walletClient.sendTransaction({
+      account,
+      chain,
+      to: tx.to,
+      data: tx.data,
+      value: tx.value,
+    });
+  } catch (error) {
+    throw error;
+  }
 
   // Wait for confirmation
-  const receipt = await publicClient.waitForTransactionReceipt({ hash });
+  let receipt;
+  try {
+    receipt = await publicClient.waitForTransactionReceipt({ hash });
+  } catch (error) {
+    throw error;
+  }
 
   return {
     hash,

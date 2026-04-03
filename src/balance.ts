@@ -101,14 +101,14 @@ export async function getQueueBalance(options: {
       depositKey: `0x${string}`;
     };
 
-    // Check if this deposit belongs to the user
+    // Report the net shielded amount so queue totals match what will land in private balance.
     if (deposit.fallbackReceiver.toLowerCase() === address.toLowerCase()) {
-      totalQueueBalance += deposit.amountIn;
+      totalQueueBalance += deposit.shieldAmount;
       pendingDeposits.push({
         nonce: nonce.toString(),
         status: DEPOSIT_STATUS_MAP[deposit.status as keyof typeof DEPOSIT_STATUS_MAP] || 'pending',
-        amount: formatUnits(deposit.amountIn, poolConfig.decimals),
-        amountWei: deposit.amountIn.toString(),
+        amount: formatUnits(deposit.shieldAmount, poolConfig.decimals),
+        amountWei: deposit.shieldAmount.toString(),
         timestamp: new Date(Number(deposit.timestamp) * 1000).toISOString(),
       });
     }
