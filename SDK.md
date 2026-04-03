@@ -230,7 +230,7 @@ veil withdraw ETH 0.05 0xRecipient --json
 
 `SIGNER_ADDRESS` can be used for address-only agent flows such as `veil status`, `veil balance`, and `veil register --unsigned` when the signer manages the wallet externally. `WALLET_KEY` and `SIGNER_ADDRESS` are mutually exclusive, and signed commands still require `WALLET_KEY`.
 
-`veil status` reports clearer setup state for agents, including whether `WALLET_KEY` is missing vs invalid, plus the public ETH balance when it can be resolved from `WALLET_KEY` or `SIGNER_ADDRESS`.
+`veil status` shows a **Signing** row that reflects the active mode (`local (WALLET_KEY)`, `external (SIGNER_ADDRESS)`, or `not configured`), plus public ETH balance when it can be resolved.
 
 ### Bankr Integration
 

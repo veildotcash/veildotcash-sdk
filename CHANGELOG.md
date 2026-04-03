@@ -7,21 +7,24 @@
 - Add `balance queue` and `balance private` command grouping while keeping compatibility aliases
 - Remove `--quiet` and standardize CLI error output
 - Mask provider URLs in human-readable `veil status` output
-- Add `--relay-url` support to `veil status` health checks
 - **Breaking**: Remove `--wallet-key` CLI flag from all commands (use `WALLET_KEY` env instead)
 - **Breaking**: Remove `--deposit-key` CLI flag from `register` and `deposit` (use `DEPOSIT_KEY` env instead)
+- **Breaking**: Remove `--veil-key`, `--rpc-url`, `--relay-url`, and `--show-utxos` CLI flags — use env vars (`VEIL_KEY`, `RPC_URL`, `RELAY_URL`) instead
 - `veil init` now defaults to wallet-derived keypair; random generation moved to `--generate`
 - `veil balance` now shows wallet public balances (ETH + USDC) in a "Wallet (public)" section
 - Deposit amounts are now **net** (what lands in pool); the 0.3% fee is added automatically via on-chain `getDepositAmountWithFee`
 - Transaction hashes in human-readable output replaced with Basescan links
 - Remove "Gas used" from all command output (human and JSON)
 - Remove "Checked" field from `veil status` human output; show meaningful status messages instead
-- `veil status` now distinguishes missing vs invalid `WALLET_KEY` and shows public ETH balance when available
+- `veil status` now shows a consolidated **Signing** row (`local (WALLET_KEY)`, `external (SIGNER_ADDRESS)`, or `not configured`) replacing the previous separate "Wallet key" + "Mode" rows
+- `veil status` shows public ETH balance when available from `WALLET_KEY` or `SIGNER_ADDRESS`
 - Add `SIGNER_ADDRESS` for unsigned/query CLI flows (`status`, `balance`, `register --unsigned`) when signing is handled externally
-- `WALLET_KEY` and `SIGNER_ADDRESS` are now treated as mutually exclusive CLI env vars
+- `WALLET_KEY` and `SIGNER_ADDRESS` are now treated as mutually exclusive CLI env vars; setting both raises `CONFIG_CONFLICT`
+- `veil init` raises `CONFIG_CONFLICT` when both `WALLET_KEY` and `SIGNER_ADDRESS` are set; provides a context-aware hint when only `SIGNER_ADDRESS` is set
 - `veil register --force` now always sends the transaction, even if the on-chain key already matches
 - `veil register --unsigned --force` now checks chain state first and emits `register` vs `changeDepositKey` accordingly
 - Clean up `--unsigned` description (remove Bankr-specific wording)
+- Private balance command (`veil balance private`) no longer prints individual UTXO details in human-readable output; full UTXO data still present in `--json` output
 
 ## 0.4.0
 

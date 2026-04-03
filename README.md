@@ -96,7 +96,7 @@ veil status
 veil status --json
 ```
 
-`veil status` also shows the resolved address, public ETH balance when available, and clearer registration status when `WALLET_KEY` is missing or invalid. For unsigned or agent flows, set `SIGNER_ADDRESS` to let `veil status` and balance commands resolve registration without a wallet key.
+`veil status` shows a **Signing** row that reflects the active mode: `local (WALLET_KEY)`, `external (SIGNER_ADDRESS)`, or `not configured`. It also shows the resolved address, public ETH balance when available, and registration state. For unsigned or agent flows, set `SIGNER_ADDRESS` to let `veil status` and balance commands resolve address and registration without a private key.
 
 ### Registration and Deposits
 

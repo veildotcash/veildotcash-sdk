@@ -165,26 +165,36 @@ Install globally: `npm install -g @veil-cash/sdk`
 ### Commands
 
 ```bash
-veil init --json                                   # Derive from wallet as JSON (default)
-veil init --json --no-save                         # Derive without saving to disk
+veil init                                          # Derive keypair from WALLET_KEY (saves to .env.veil)
 veil init --generate                               # Generate random keypair
-veil init --signature 0x...                        # Derive from signature
+veil init --signature 0x...                        # Derive from pre-computed EIP-191 signature
+veil init --force                                  # Overwrite existing keypair without prompting
+veil init --no-save                                # Print keypair without saving to disk
+veil init --json                                   # Output keypair as JSON (no prompts, no file save)
 
-veil keypair                                       # Show current keypair
+veil keypair                                       # Show current keypair (from VEIL_KEY)
+veil keypair --json                                # Show current keypair as JSON
+
+veil status                                        # Check config, signing mode, registration, and relay health
+veil status --json                                 # Machine-readable status
 
 SIGNER_ADDRESS=0x... veil register --unsigned       # Unsigned register payload
 SIGNER_ADDRESS=0x... veil register --unsigned --force # Unsigned register/change-key payload (depends on chain state)
+veil register --unsigned --address 0x...           # Unsigned register payload (explicit address)
+veil register --json                               # Register and output result as JSON
 
 veil deposit ETH 0.1 --unsigned                    # Unsigned ETH deposit payload
 veil deposit USDC 100 --unsigned                   # Unsigned USDC deposit payload(s)
+veil deposit ETH 0.1 --json                        # Deposit and output result as JSON
 
 veil balance                                       # All pool balances
 veil balance --pool eth                            # ETH pool only
 veil balance --pool usdc                           # USDC pool only
+veil balance --json                                # Machine-readable balances
 veil balance queue --pool eth                      # Queue-only balance
+veil balance queue --address 0x... --json          # Queue balance for explicit address
 veil balance private --pool eth                    # Private-only balance
-
-veil status                                        # Check config, wallet ETH balance, registration, and service health
+veil balance private --json                        # Private balance as JSON
 ```
 
 ### Error format
