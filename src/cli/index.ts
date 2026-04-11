@@ -13,6 +13,7 @@
  *   veil withdraw ETH 0.1 0x...      # Withdraw to public address
  *   veil transfer ETH 0.1 0x...      # Transfer privately
  *   veil merge ETH 0.5               # Merge UTXOs (self-transfer)
+ *   veil subaccount status --slot 0  # Check subaccount status
  */
 
 import { Command } from 'commander';
@@ -27,6 +28,7 @@ import { createPrivateBalanceCommand } from './commands/private-balance.js';
 import { createWithdrawCommand } from './commands/withdraw.js';
 import { createTransferCommand, createMergeCommand } from './commands/transfer.js';
 import { createStatusCommand } from './commands/status.js';
+import { createSubaccountCommand } from './commands/subaccount.js';
 
 // Load environment variables
 loadEnv();
@@ -36,13 +38,14 @@ const program = new Command();
 program
   .name('veil')
   .description('CLI for Veil Cash privacy pools on Base')
-  .version('0.5.0')
+  .version('0.6.0')
   .addHelpText('after', `
 Getting started:
   veil init
   veil register
   veil deposit ETH 0.1
   veil balance
+  veil subaccount status --slot 0
 `);
 
 // Add commands
@@ -57,6 +60,7 @@ program.addCommand(createWithdrawCommand());
 program.addCommand(createTransferCommand());
 program.addCommand(createMergeCommand());
 program.addCommand(createStatusCommand());
+program.addCommand(createSubaccountCommand());
 
 const knownTopLevelCommands = new Set([
   ...program.commands.map((command) => command.name()),

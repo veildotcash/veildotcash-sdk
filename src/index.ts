@@ -100,8 +100,10 @@ export type { ProofInput } from './prover.js';
 // Addresses and config
 export { 
   ADDRESSES, 
+  FORWARDER_CONTRACT_VERSION,
   POOL_CONFIG, 
   getAddresses,
+  getForwarderFactoryAddress,
   getPoolAddress,
   getQueueAddress,
   getRelayUrl,
@@ -119,9 +121,31 @@ export {
 export {
   ENTRY_ABI,
   ERC20_ABI,
+  FORWARDER_ABI,
+  FORWARDER_FACTORY_ABI,
   QUEUE_ABI,
   POOL_ABI,
 } from './abi.js';
+
+// Subaccount functions
+export {
+  MAX_SUBACCOUNT_SLOTS,
+  deriveSubaccountChildPrivateKey,
+  deriveSubaccountSalt,
+  deriveSubaccountChildOwner,
+  deriveSubaccountChildDepositKey,
+  deriveSubaccountSlot,
+  predictSubaccountForwarder,
+  isSubaccountForwarderDeployed,
+  deploySubaccountForwarder,
+  sweepSubaccountForwarder,
+  getSubaccountStatus,
+  buildSubaccountWithdrawTypedData,
+  signSubaccountWithdraw,
+  isSubaccountWithdrawNonceUsed,
+  findNextSubaccountWithdrawNonce,
+  buildSubaccountRecoveryTx,
+} from './subaccount.js';
 
 // Utilities
 export { 
@@ -166,4 +190,15 @@ export type {
   WithdrawResult,
   TransferResult,
   UtxoSelectionResult,
+  SubaccountAsset,
+  SubaccountSlot,
+  SubaccountDeployRequest,
+  SubaccountSweepRequest,
+  SubaccountRelayResult,
+  SubaccountAssetBalance,
+  SubaccountBalances,
+  SubaccountQueueStatus,
+  SubaccountStatusResult,
+  SubaccountWithdrawTypedData,
+  SubaccountRecoveryResult,
 } from './types.js';

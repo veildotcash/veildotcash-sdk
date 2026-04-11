@@ -647,3 +647,175 @@ export const ERC20_ABI = [
     type: 'function',
   },
 ] as const;
+
+/**
+ * Veil Forwarder Factory ABI
+ */
+export const FORWARDER_FACTORY_ABI = [
+  {
+    inputs: [],
+    name: 'CONTRACT_VERSION',
+    outputs: [{ internalType: 'string', name: '', type: 'string' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [
+      { internalType: 'bytes32', name: '_salt', type: 'bytes32' },
+      { internalType: 'bytes', name: '_childDepositKey', type: 'bytes' },
+      { internalType: 'address', name: '_owner', type: 'address' },
+    ],
+    name: 'computeAddress',
+    outputs: [{ internalType: 'address', name: '', type: 'address' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [
+      { internalType: 'bytes32', name: '_salt', type: 'bytes32' },
+      { internalType: 'bytes', name: '_childDepositKey', type: 'bytes' },
+      { internalType: 'address', name: '_owner', type: 'address' },
+    ],
+    name: 'deploy',
+    outputs: [{ internalType: 'address', name: 'forwarder', type: 'address' }],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [],
+    name: 'relayer',
+    outputs: [{ internalType: 'address', name: '', type: 'address' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [],
+    name: 'veilEntry',
+    outputs: [{ internalType: 'address payable', name: '', type: 'address' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [],
+    name: 'usdc',
+    outputs: [{ internalType: 'address', name: '', type: 'address' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [],
+    name: 'owner',
+    outputs: [{ internalType: 'address', name: '', type: 'address' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+] as const;
+
+/**
+ * Veil Forwarder ABI
+ */
+export const FORWARDER_ABI = [
+  {
+    inputs: [],
+    name: 'CONTRACT_VERSION',
+    outputs: [{ internalType: 'string', name: '', type: 'string' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [
+      { internalType: 'address', name: '_token', type: 'address' },
+      { internalType: 'address', name: '_to', type: 'address' },
+      { internalType: 'uint256', name: '_amount', type: 'uint256' },
+      { internalType: 'uint256', name: '_nonce', type: 'uint256' },
+      { internalType: 'uint256', name: '_deadline', type: 'uint256' },
+      { internalType: 'bytes', name: '_signature', type: 'bytes' },
+    ],
+    name: 'withdraw',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
+    name: 'usedNonces',
+    outputs: [{ internalType: 'bool', name: '', type: 'bool' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [],
+    name: 'owner',
+    outputs: [{ internalType: 'address', name: '', type: 'address' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [],
+    name: 'factory',
+    outputs: [{ internalType: 'address', name: '', type: 'address' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [],
+    name: 'childDepositKey',
+    outputs: [{ internalType: 'bytes', name: '', type: 'bytes' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [],
+    name: 'entry',
+    outputs: [{ internalType: 'address', name: '', type: 'address' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [],
+    name: 'usdc',
+    outputs: [{ internalType: 'address', name: '', type: 'address' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [],
+    name: 'sweepETH',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [],
+    name: 'sweepUSDC',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [],
+    name: 'eip712Domain',
+    outputs: [
+      { internalType: 'bytes1', name: 'fields', type: 'bytes1' },
+      { internalType: 'string', name: 'name', type: 'string' },
+      { internalType: 'string', name: 'version', type: 'string' },
+      { internalType: 'uint256', name: 'chainId', type: 'uint256' },
+      { internalType: 'address', name: 'verifyingContract', type: 'address' },
+      { internalType: 'bytes32', name: 'salt', type: 'bytes32' },
+      { internalType: 'uint256[]', name: 'extensions', type: 'uint256[]' },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  { type: 'error', name: 'ZeroAddress', inputs: [] },
+  { type: 'error', name: 'ZeroAmount', inputs: [] },
+  { type: 'error', name: 'InvalidDepositKey', inputs: [] },
+  { type: 'error', name: 'NotRelayer', inputs: [] },
+  { type: 'error', name: 'NoETHBalance', inputs: [] },
+  { type: 'error', name: 'NoTokenBalance', inputs: [] },
+  { type: 'error', name: 'TokenApproveFailed', inputs: [] },
+  { type: 'error', name: 'ETHTransferFailed', inputs: [] },
+  { type: 'error', name: 'NonceUsed', inputs: [] },
+  { type: 'error', name: 'Unauthorized', inputs: [] },
+  { type: 'error', name: 'DeadlineExpired', inputs: [] },
+] as const;

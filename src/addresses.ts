@@ -14,9 +14,15 @@ export const ADDRESSES: NetworkAddresses = {
   usdcPool: '0x5c50d58E49C59d112680c187De2Bf989d2a91242',
   usdcQueue: '0x5530241b24504bF05C9a22e95A1F5458888e6a9B',
   usdcToken: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+  forwarderFactory: '0x2848Fd62293A1ff3b4a897E9FcD0e5962dcc8101',
   chainId: 8453,
   relayUrl: 'https://veil-relay.up.railway.app',
 } as const;
+
+/**
+ * Veil forwarder EIP-712 contract version
+ */
+export const FORWARDER_CONTRACT_VERSION = '1' as const;
 
 /**
  * Pool configuration (decimals, symbols, etc.)
@@ -74,6 +80,14 @@ export function getQueueAddress(
     case 'usdc': return addresses.usdcQueue;
     default: throw new Error(`Unknown pool: ${pool}`);
   }
+}
+
+/**
+ * Get the forwarder factory contract address
+ * @returns Forwarder factory address for Base mainnet
+ */
+export function getForwarderFactoryAddress(): `0x${string}` {
+  return getAddresses().forwarderFactory;
 }
 
 /**

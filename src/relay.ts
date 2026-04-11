@@ -50,6 +50,35 @@ export class RelayError extends Error {
   }
 }
 
+export async function postRelayJson<T>(
+  endpoint: string,
+  body: unknown,
+  relayUrl?: string,
+): Promise<T> {
+  const url = relayUrl || getRelayUrl();
+  const response = await fetch(`${url}${endpoint}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    const errorData = data as RelayErrorResponse;
+    throw new RelayError(
+      errorData.error || errorData.message || 'Relay request failed',
+      response.status,
+      errorData.retryAfter,
+      errorData.network,
+    );
+  }
+
+  return data as T;
+}
+
 /**
  * Submit a withdrawal or transfer to the relay service
  * 
@@ -107,34 +136,17 @@ export async function submitRelay(options: SubmitRelayOptions): Promise<RelayRes
   }
 
   const relayUrl = customRelayUrl || getRelayUrl();
-  const endpoint = `${relayUrl}/relay/${pool}`;
-
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
+  const endpoint = `/relay/${pool}`;
+  return postRelayJson<RelayResponse>(
+    endpoint,
+    {
       type,
       proofArgs,
       extData,
       metadata,
-    }),
-  });
-
-  const data = await response.json();
-
-  if (!response.ok) {
-    const errorData = data as RelayErrorResponse;
-    throw new RelayError(
-      errorData.error || errorData.message || 'Relay request failed',
-      response.status,
-      errorData.retryAfter,
-      errorData.network
-    );
-  }
-
-  return data as RelayResponse;
+    },
+    relayUrl,
+  );
 }
 
 /**

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.6.0
+
+- Add SDK-first subaccount support: deterministic slot derivation, forwarder prediction, deployment status, relay-backed deploy/sweep, queue-aware status, and direct recovery transaction building
+- Add `src/subaccount.ts` public exports for subaccount derivation, status, relay operations, withdraw typed-data signing, nonce scanning, and recovery transaction creation
+- Add forwarder factory address/config plus `FORWARDER_ABI` and `FORWARDER_FACTORY_ABI`
+- Add `veil subaccount` CLI command family: `derive`, `status`, `deploy`, `sweep`, `recover`, and `address`
+- Add `INVALID_SLOT` CLI error code and extend on-chain error decoding to include forwarder errors
+- Document the subaccount mental model and operational caveats in `README.md` and `SDK.md`
+
 ## 0.5.0
 
 - Refocus the package docs around the CLI and move SDK usage into `SDK.md`
