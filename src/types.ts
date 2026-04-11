@@ -27,6 +27,7 @@ export interface NetworkAddresses {
   usdcPool: `0x${string}`;
   usdcQueue: `0x${string}`;
   usdcToken: `0x${string}`;
+  forwarderFactory: `0x${string}`;
   chainId: number;
   relayUrl: string;
 }
@@ -307,4 +308,137 @@ export interface UtxoSelectionResult {
   totalSelected: bigint;
   /** Change amount to return to sender (wei) */
   changeAmount: bigint;
+}
+
+// =============================================================================
+// Subaccount Types
+// =============================================================================
+
+/**
+ * Supported subaccount assets
+ */
+export type SubaccountAsset = 'eth' | 'usdc';
+
+/**
+ * Deterministically derived subaccount slot metadata
+ */
+export interface SubaccountSlot {
+  slot: number;
+  childOwner: `0x${string}`;
+  childDepositKey: string;
+  salt: `0x${string}`;
+  forwarderAddress: `0x${string}`;
+}
+
+/**
+ * Relay-backed forwarder deploy request
+ */
+export interface SubaccountDeployRequest {
+  rootPrivateKey: `0x${string}`;
+  slot: number;
+  relayUrl?: string;
+  rpcUrl?: string;
+}
+
+/**
+ * Relay-backed forwarder sweep request
+ */
+export interface SubaccountSweepRequest {
+  forwarderAddress: `0x${string}`;
+  asset: SubaccountAsset;
+  relayUrl?: string;
+}
+
+/**
+ * Relay response for subaccount deploy/sweep operations
+ */
+export interface SubaccountRelayResult {
+  success: boolean;
+  transactionHash: string;
+  blockNumber: string;
+  gasUsed: string;
+  status: string;
+  network: string;
+}
+
+/**
+ * Human-readable and wei-denominated balance
+ */
+export interface SubaccountAssetBalance {
+  balance: string;
+  balanceWei: string;
+}
+
+/**
+ * Forwarder wallet balances for both supported assets
+ */
+export interface SubaccountBalances {
+  eth: SubaccountAssetBalance;
+  usdc: SubaccountAssetBalance;
+}
+
+/**
+ * Queue status for a specific asset
+ */
+export interface SubaccountQueueStatus {
+  asset: SubaccountAsset;
+  queueBalance: string;
+  queueBalanceWei: string;
+  pendingCount: number;
+  pendingDeposits: PendingDeposit[];
+}
+
+/**
+ * Combined subaccount status result
+ */
+export interface SubaccountStatusResult {
+  slot: SubaccountSlot;
+  deployed: boolean;
+  balances: SubaccountBalances;
+  queues: {
+    eth: SubaccountQueueStatus;
+    usdc: SubaccountQueueStatus;
+  };
+}
+
+/**
+ * Typed data for forwarder withdraw signing
+ */
+export interface SubaccountWithdrawTypedData {
+  domain: {
+    name: 'VeilForwarder';
+    version: string;
+    chainId: number;
+    verifyingContract: `0x${string}`;
+  };
+  types: {
+    Withdraw: Array<{
+      name: 'token' | 'to' | 'amount' | 'nonce' | 'deadline';
+      type: 'address' | 'uint256';
+    }>;
+  };
+  primaryType: 'Withdraw';
+  message: {
+    token: `0x${string}`;
+    to: `0x${string}`;
+    amount: bigint;
+    nonce: bigint;
+    deadline: bigint;
+  };
+}
+
+/**
+ * Built recovery transaction and signing metadata
+ */
+export interface SubaccountRecoveryResult {
+  transaction: TransactionData;
+  forwarderAddress: `0x${string}`;
+  asset: SubaccountAsset;
+  amount: string;
+  amountWei: string;
+  nonce: string;
+  deadline: string;
+  recipient: `0x${string}`;
+  tokenAddress: `0x${string}`;
+  signature: `0x${string}`;
 }

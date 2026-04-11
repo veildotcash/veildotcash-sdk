@@ -14,7 +14,7 @@ import {
 import { privateKeyToAccount } from 'viem/accounts';
 import { base } from 'viem/chains';
 import type { TransactionData } from '../types.js';
-import { ENTRY_ABI, ERC20_ABI } from '../abi.js';
+import { ENTRY_ABI, ERC20_ABI, FORWARDER_ABI } from '../abi.js';
 import { getAddresses, POOL_CONFIG, ADDRESSES } from '../addresses.js';
 
 export interface WalletConfig {
@@ -118,7 +118,7 @@ function decodeCustomError(error: unknown): string | null {
     
     if (possibleData && typeof possibleData === 'string' && possibleData.startsWith('0x')) {
       try {
-        for (const abi of [ENTRY_ABI] as const) {
+        for (const abi of [ENTRY_ABI, FORWARDER_ABI] as const) {
           try {
             const decoded = decodeErrorResult({
               abi,

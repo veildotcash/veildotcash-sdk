@@ -8,6 +8,8 @@ SDK and CLI for interacting with [Veil Cash](https://veil.cash) privacy pools on
 
 Generate keypairs, register, deposit, withdraw, transfer, and merge ETH and USDC privately.
 
+`0.6.0` adds SDK-first subaccount support for deterministic slot derivation, forwarder status, relay-backed deploy/sweep, and direct recovery.
+
 ## Installation
 
 ```bash
@@ -76,9 +78,17 @@ veil withdraw ETH 0.05 0xRecipientAddress
 veil transfer ETH 0.02 0xRecipientAddress
 veil merge ETH 0.1
 
-# 8. Use JSON or unsigned modes when you need automation
+# 8. Work with subaccounts
+veil subaccount derive --slot 0
+veil subaccount status --slot 0
+veil subaccount deploy --slot 0
+veil subaccount sweep --slot 0 --asset eth
+veil subaccount recover --slot 0 --asset usdc --to 0xRecipientAddress --amount 25
+
+# 9. Use JSON or unsigned modes when you need automation
 veil status --json
 veil deposit ETH 0.1 --unsigned
+veil subaccount status --slot 0 --json
 ```
 
 ## CLI Tasks
@@ -188,6 +198,24 @@ veil merge USDC 100
 veil merge ETH 0.1 --json
 ```
 
+### Subaccounts
+
+Subaccounts are deterministic child slots derived from your main `VEIL_KEY`:
+
+`root key -> slot -> child key -> child deposit key -> forwarder`
+
+Base mainnet only. Deploy and sweep are relay-backed. Status reports the forwarder wallet and queue state only, not private pool attribution after queued funds are accepted. Recovery is for assets still sitting on the forwarder after refund or rejection, and is submitted directly on-chain by your CLI gas payer.
+
+```bash
+veil subaccount derive --slot 0
+veil subaccount status --slot 0
+veil subaccount address --slot 0
+veil subaccount deploy --slot 0
+veil subaccount sweep --slot 0 --asset eth
+veil subaccount recover --slot 0 --asset usdc --to 0xRecipientAddress --amount 25
+veil subaccount status --slot 0 --json
+```
+
 ## Environment Variables
 
 The CLI uses two config files:
@@ -206,7 +234,7 @@ The CLI uses two config files:
 | `WALLET_KEY` | Ethereum wallet private key (for signing transactions) |
 | `SIGNER_ADDRESS` | Ethereum address for unsigned/query flows when signing is handled externally |
 | `RPC_URL` | Base RPC URL (optional, defaults to public RPC) |
-| `RELAY_URL` | Override relay base URL for relayed CLI operations and status checks |
+| `RELAY_URL` | Override relay base URL for relayed CLI operations, subaccount deploy/sweep, and status checks |
 
 `WALLET_KEY` and `SIGNER_ADDRESS` are mutually exclusive. Use `WALLET_KEY` for commands that sign transactions, and `SIGNER_ADDRESS` for address-only agent flows like `status`, `balance`, and `register --unsigned`.
 
@@ -231,6 +259,7 @@ Commands print human-readable success output by default. Errors are standardized
 | `DEPOSIT_KEY_MISSING` | DEPOSIT_KEY not provided |
 | `CONFIG_CONFLICT` | Conflicting CLI env vars provided |
 | `INVALID_ADDRESS` | Invalid Ethereum address format |
+| `INVALID_SLOT` | Invalid subaccount slot format |
 | `INVALID_AMOUNT` | Invalid or below minimum amount |
 | `INSUFFICIENT_BALANCE` | Not enough ETH balance |
 | `USER_NOT_REGISTERED` | Recipient not registered in Veil |

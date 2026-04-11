@@ -11,6 +11,7 @@ export const ErrorCode = {
   DEPOSIT_KEY_MISSING: 'DEPOSIT_KEY_MISSING',
   CONFIG_CONFLICT: 'CONFIG_CONFLICT',
   INVALID_ADDRESS: 'INVALID_ADDRESS',
+  INVALID_SLOT: 'INVALID_SLOT',
   INVALID_AMOUNT: 'INVALID_AMOUNT',
   INSUFFICIENT_BALANCE: 'INSUFFICIENT_BALANCE',
   USER_NOT_REGISTERED: 'USER_NOT_REGISTERED',
@@ -57,6 +58,9 @@ function inferErrorCode(message: string): ErrorCodeType {
   }
   if (msg.includes('invalid') && msg.includes('address')) {
     return ErrorCode.INVALID_ADDRESS;
+  }
+  if (msg.includes('invalid') && msg.includes('slot')) {
+    return ErrorCode.INVALID_SLOT;
   }
   if (msg.includes('insufficient balance') || msg.includes('not enough')) {
     return ErrorCode.INSUFFICIENT_BALANCE;

@@ -10,7 +10,7 @@ If you are looking for the CLI first-run flow, go back to the main [README](./RE
 import {
   Keypair, buildRegisterTx, buildDepositETHTx,
   buildDepositUSDCTx, buildApproveUSDCTx,
-  withdraw, transfer,
+  withdraw, transfer, getSubaccountStatus,
 } from '@veil-cash/sdk';
 import { createWalletClient, http } from 'viem';
 import { base } from 'viem/chains';
@@ -64,6 +64,13 @@ const transferResult = await transfer({
   senderKeypair: keypair,
   pool: 'eth', // 'eth' | 'usdc' (default: 'eth')
 });
+
+// 7. Inspect a deterministic subaccount slot
+const subaccount = await getSubaccountStatus({
+  rootPrivateKey: keypair.privkey as `0x${string}`,
+  slot: 0,
+});
+console.log(subaccount.slot.forwarderAddress);
 
 ```
 
@@ -188,6 +195,53 @@ const privateBalance = await getPrivateBalance({
   keypair,
   pool: 'usdc',
 });
+```
+
+### Subaccounts
+
+Subaccounts are deterministic child slots derived from your main Veil key:
+
+`root key -> slot -> child key -> child deposit key -> forwarder`
+
+Base mainnet only. Status shows the forwarder wallet and queue state only. Deploy and sweep are relay-backed. Recovery signs a forwarder withdraw request with the child key and returns a direct transaction for your gas payer to submit.
+
+```typescript
+import {
+  deriveSubaccountSlot,
+  getSubaccountStatus,
+  deploySubaccountForwarder,
+  sweepSubaccountForwarder,
+  buildSubaccountRecoveryTx,
+} from '@veil-cash/sdk';
+
+const slot = await deriveSubaccountSlot({
+  rootPrivateKey: veilKey,
+  slot: 0,
+});
+
+const status = await getSubaccountStatus({
+  rootPrivateKey: veilKey,
+  slot: 0,
+});
+
+await deploySubaccountForwarder({
+  rootPrivateKey: veilKey,
+  slot: 0,
+});
+
+await sweepSubaccountForwarder({
+  forwarderAddress: slot.forwarderAddress,
+  asset: 'eth',
+});
+
+const recovery = await buildSubaccountRecoveryTx({
+  rootPrivateKey: veilKey,
+  slot: 0,
+  asset: 'usdc',
+  to: '0xRecipientAddress',
+  amount: '25',
+});
+// Send recovery.transaction with your wallet client
 ```
 
 ### Addresses
