@@ -134,11 +134,14 @@ export async function predictSubaccountForwarder(options: {
   rpcUrl?: string;
 }): Promise<`0x${string}`> {
   const publicClient = createBaseClient(options.rpcUrl);
+  const depositKeyBytes = options.childDepositKey.startsWith('0x')
+    ? options.childDepositKey
+    : `0x${options.childDepositKey}`;
   return publicClient.readContract({
     abi: FORWARDER_FACTORY_ABI,
     address: getForwarderFactoryAddress(),
     functionName: 'computeAddress',
-    args: [options.salt, options.childDepositKey as `0x${string}`, options.childOwner],
+    args: [options.salt, depositKeyBytes as `0x${string}`, options.childOwner],
   }) as Promise<`0x${string}`>;
 }
 
@@ -183,14 +186,14 @@ export async function isSubaccountForwarderDeployed(options: {
 
 export async function deploySubaccountForwarder(
   options: SubaccountDeployRequest,
-): Promise<SubaccountRelayResult> {
+): Promise<SubaccountRelayResult & { slot: SubaccountSlot }> {
   const slot = await deriveSubaccountSlot({
     rootPrivateKey: options.rootPrivateKey,
     slot: options.slot,
     rpcUrl: options.rpcUrl,
   });
 
-  return postRelayJson<SubaccountRelayResult>(
+  const result = await postRelayJson<SubaccountRelayResult>(
     '/stealth/deploy',
     {
       salt: slot.salt,
@@ -200,6 +203,8 @@ export async function deploySubaccountForwarder(
     },
     options.relayUrl,
   );
+
+  return { ...result, slot };
 }
 
 export async function sweepSubaccountForwarder(
