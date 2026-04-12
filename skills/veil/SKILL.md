@@ -328,6 +328,8 @@ Important:
 
 Deposits treat the CLI amount as the **net** amount that lands in the pool.
 The `0.3%` protocol fee is calculated on-chain and added automatically.
+After submission, deposits go through screening / queue processing before they
+are accepted into the private pool. This typically takes around `10-15 minutes`.
 
 ```bash
 veil deposit ETH 0.1
@@ -381,6 +383,9 @@ Human-readable balance output includes:
 
 - wallet public balances (`ETH`, `USDC`)
 - queue and private balances
+
+If a recent deposit still appears in queue balance, screening / queue processing
+may still be in progress. Typical processing time is around `10-15 minutes`.
 
 ---
 
