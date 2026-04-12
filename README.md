@@ -28,7 +28,7 @@ npm install -g @veil-cash/sdk
 
 ## Agent Skill
 
-This repo includes a Veil agent skill at `[skills/veil/SKILL.md](./skills/veil/SKILL.md)`.
+This repo includes a Veil agent skill at [skills/veil/SKILL.md](./skills/veil/SKILL.md).
 
 Quick mapping:
 
@@ -36,7 +36,7 @@ Quick mapping:
 - CLI binary: `veil`
 - agent skill file: `skills/veil/SKILL.md`
 
-If you are pointing an agent at this repo, send it to `[skills/veil/SKILL.md](./skills/veil/SKILL.md)` for the canonical CLI workflow.
+If you are pointing an agent at this repo, send it to [skills/veil/SKILL.md](./skills/veil/SKILL.md) for the canonical CLI workflow.
 
 If you install the npm package, the published package also includes the `skills/` directory so the same skill can be discovered from the installed package contents.
 
