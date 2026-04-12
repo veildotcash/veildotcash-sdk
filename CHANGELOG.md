@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.6.2
+
+- Add `mergeSubaccount()` SDK function to transfer a subaccount's entire private pool balance back to the main wallet via a ZK transfer proof
+- Add `getSubaccountPrivateBalance()` SDK helper and include summarized private balances in `getSubaccountStatus()`
+- Add `SubaccountMergeOptions` and `SubaccountMergeResult` types
+- Add `veil subaccount merge --slot <n> --pool <pool>` CLI command
+- Update `veil subaccount status` to show forwarder balances, private balances, and queue state
+- Export `mergeSubaccount`, `SubaccountMergeOptions`, and `SubaccountMergeResult` from package entry
+- Document merge in `SDK.md`, `README.md`, `SKILL.md`, and `reference.md`
+
 ## 0.6.0
 
 - Add SDK-first subaccount support: deterministic slot derivation, forwarder prediction, deployment status, relay-backed deploy/sweep, queue-aware status, and direct recovery transaction building

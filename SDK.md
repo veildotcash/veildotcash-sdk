@@ -10,7 +10,7 @@ If you are looking for the CLI first-run flow, go back to the main [README](./RE
 import {
   Keypair, buildRegisterTx, buildDepositETHTx,
   buildDepositUSDCTx, buildApproveUSDCTx,
-  withdraw, transfer, getSubaccountStatus,
+  withdraw, transfer, getSubaccountStatus, mergeSubaccount,
 } from '@veil-cash/sdk';
 import { createWalletClient, http } from 'viem';
 import { base } from 'viem/chains';
@@ -203,14 +203,16 @@ Subaccounts are deterministic child slots derived from your main Veil key:
 
 `root key -> slot -> child key -> child deposit key -> forwarder`
 
-Base mainnet only. Status shows the forwarder wallet and queue state only. Deploy and sweep are relay-backed. Recovery signs a forwarder withdraw request with the child key and returns a direct transaction for your gas payer to submit.
+Base mainnet only. Status shows the child slot's forwarder wallet balances, private pool balances, and queue state. Deploy and sweep are relay-backed. Merge transfers the subaccount's private pool balance back to the main wallet via a ZK proof. Recovery signs a forwarder withdraw request with the child key and returns a direct transaction for your gas payer to submit.
 
 ```typescript
 import {
   deriveSubaccountSlot,
+  getSubaccountPrivateBalance,
   getSubaccountStatus,
   deploySubaccountForwarder,
   sweepSubaccountForwarder,
+  mergeSubaccount,
   buildSubaccountRecoveryTx,
 } from '@veil-cash/sdk';
 
@@ -223,6 +225,14 @@ const status = await getSubaccountStatus({
   rootPrivateKey: veilKey,
   slot: 0,
 });
+// status.privateBalances.eth.privateBalance, status.privateBalances.usdc.privateBalance
+
+const privateBalance = await getSubaccountPrivateBalance({
+  rootPrivateKey: veilKey,
+  slot: 0,
+  pool: 'eth',
+});
+// privateBalance.privateBalance, privateBalance.unspentCount
 
 await deploySubaccountForwarder({
   rootPrivateKey: veilKey,
@@ -233,6 +243,14 @@ await sweepSubaccountForwarder({
   forwarderAddress: slot.forwarderAddress,
   asset: 'eth',
 });
+
+// Merge subaccount's private pool balance back to the main wallet
+const mergeResult = await mergeSubaccount({
+  rootPrivateKey: veilKey,
+  slot: 0,
+  pool: 'eth', // 'eth' | 'usdc' (default: 'eth')
+});
+// mergeResult.amount, mergeResult.transactionHash
 
 const recovery = await buildSubaccountRecoveryTx({
   rootPrivateKey: veilKey,

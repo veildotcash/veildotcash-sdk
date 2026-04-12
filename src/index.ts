@@ -139,12 +139,14 @@ export {
   isSubaccountForwarderDeployed,
   deploySubaccountForwarder,
   sweepSubaccountForwarder,
+  getSubaccountPrivateBalance,
   getSubaccountStatus,
   buildSubaccountWithdrawTypedData,
   signSubaccountWithdraw,
   isSubaccountWithdrawNonceUsed,
   findNextSubaccountWithdrawNonce,
   buildSubaccountRecoveryTx,
+  mergeSubaccount,
 } from './subaccount.js';
 
 // Utilities
@@ -197,8 +199,12 @@ export type {
   SubaccountRelayResult,
   SubaccountAssetBalance,
   SubaccountBalances,
+  SubaccountPrivateBalanceStatus,
+  SubaccountPrivateBalances,
   SubaccountQueueStatus,
   SubaccountStatusResult,
   SubaccountWithdrawTypedData,
   SubaccountRecoveryResult,
+  SubaccountMergeOptions,
+  SubaccountMergeResult,
 } from './types.js';
