@@ -148,9 +148,11 @@ const priv = await getPrivateBalance({
 ```typescript
 import {
   deriveSubaccountSlot,
+  getSubaccountPrivateBalance,
   getSubaccountStatus,
   deploySubaccountForwarder,
   sweepSubaccountForwarder,
+  mergeSubaccount,
   buildSubaccountRecoveryTx,
   isSubaccountForwarderDeployed,
   MAX_SUBACCOUNT_SLOTS,
@@ -168,12 +170,20 @@ const deployed = await isSubaccountForwarderDeployed({
   forwarderAddress: slot.forwarderAddress,
 });
 
-// Full status (deployment, balances, queue state)
+// Full status (deployment, forwarder balances, private balances, queue state)
 const status = await getSubaccountStatus({
   rootPrivateKey: '0xVEIL_KEY',
   slot: 0,
 });
-// status.deployed, status.balances.eth, status.balances.usdc, status.queues
+// status.deployed, status.balances, status.privateBalances, status.queues
+
+// Private pool balance for a single slot + pool
+const privateBalance = await getSubaccountPrivateBalance({
+  rootPrivateKey: '0xVEIL_KEY',
+  slot: 0,
+  pool: 'eth',
+});
+// privateBalance.privateBalance, privateBalance.unspentCount, privateBalance.utxos
 
 // Deploy forwarder (relay-backed, no WALLET_KEY needed)
 const deployResult = await deploySubaccountForwarder({
@@ -187,6 +197,14 @@ const sweepResult = await sweepSubaccountForwarder({
   forwarderAddress: slot.forwarderAddress,
   asset: 'eth',     // 'eth' | 'usdc'
 });
+
+// Merge subaccount's private balance back to main wallet (relay-backed)
+const mergeResult = await mergeSubaccount({
+  rootPrivateKey: '0xVEIL_KEY',
+  slot: 0,
+  pool: 'eth',     // 'eth' | 'usdc' (default: 'eth')
+});
+// mergeResult.success, mergeResult.transactionHash, mergeResult.amount, mergeResult.slot, mergeResult.pool
 
 // Build recovery transaction (for assets stuck on forwarder)
 const recovery = await buildSubaccountRecoveryTx({
@@ -256,12 +274,14 @@ veil balance private --json                        # Private balance as JSON
 veil subaccount derive --slot 0                    # Derive slot metadata
 veil subaccount derive --slot 0 --json             # Derive as JSON
 veil subaccount address --slot 0                   # Print forwarder address
-veil subaccount status --slot 0                    # Deployment, balances, queue state
+veil subaccount status --slot 0                    # Deployment, forwarder balances, private balances, queue state
 veil subaccount status --slot 0 --json             # Status as JSON
 veil subaccount deploy --slot 0                    # Deploy forwarder (relay-backed)
 veil subaccount deploy --slot 0 --json             # Deploy as JSON
 veil subaccount sweep --slot 0 --asset eth         # Sweep ETH into pool (relay-backed)
 veil subaccount sweep --slot 0 --asset usdc --json # Sweep USDC as JSON
+veil subaccount merge --slot 0 --pool eth          # Merge subaccount balance to main wallet
+veil subaccount merge --slot 0 --pool usdc --json  # Merge USDC as JSON
 veil subaccount recover --slot 0 --asset usdc --to 0x... --amount 25   # Recover assets (needs WALLET_KEY)
 veil subaccount recover --slot 0 --asset eth --to 0x... --amount 0.05 --json
 ```

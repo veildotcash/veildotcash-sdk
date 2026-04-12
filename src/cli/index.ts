@@ -38,7 +38,7 @@ const program = new Command();
 program
   .name('veil')
   .description('CLI for Veil Cash privacy pools on Base')
-  .version('0.6.1')
+  .version('0.6.2')
   .addHelpText('after', `
 Getting started:
   veil init

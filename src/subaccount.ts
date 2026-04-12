@@ -12,14 +12,21 @@ import {
 } from 'viem';
 import { privateKeyToAccount, privateKeyToAddress } from 'viem/accounts';
 import { base } from 'viem/chains';
-import { FORWARDER_ABI, FORWARDER_FACTORY_ABI, ERC20_ABI } from './abi.js';
-import { FORWARDER_CONTRACT_VERSION, getAddresses, getForwarderFactoryAddress } from './addresses.js';
-import { getQueueBalance } from './balance.js';
+import { FORWARDER_ABI, FORWARDER_FACTORY_ABI, ERC20_ABI, POOL_ABI } from './abi.js';
+import { FORWARDER_CONTRACT_VERSION, getAddresses, getForwarderFactoryAddress, getPoolAddress, POOL_CONFIG } from './addresses.js';
+import { getPrivateBalance, getQueueBalance } from './balance.js';
 import { Keypair } from './keypair.js';
-import { postRelayJson } from './relay.js';
+import { postRelayJson, submitRelay } from './relay.js';
+import { prepareTransaction } from './transaction.js';
+import { Utxo } from './utxo.js';
+import { selectUtxosForWithdraw } from './withdraw.js';
 import type {
   SubaccountAsset,
   SubaccountDeployRequest,
+  SubaccountMergeOptions,
+  SubaccountMergeResult,
+  PrivateBalanceResult,
+  SubaccountPrivateBalanceStatus,
   SubaccountQueueStatus,
   SubaccountRecoveryResult,
   SubaccountRelayResult,
@@ -238,6 +245,37 @@ function toQueueStatus(
   };
 }
 
+function toPrivateBalanceStatus(result: PrivateBalanceResult): SubaccountPrivateBalanceStatus {
+  return {
+    privateBalance: result.privateBalance,
+    privateBalanceWei: result.privateBalanceWei,
+    utxoCount: result.utxoCount,
+    spentCount: result.spentCount,
+    unspentCount: result.unspentCount,
+  };
+}
+
+export async function getSubaccountPrivateBalance(options: {
+  rootPrivateKey: `0x${string}`;
+  slot: number;
+  pool?: 'eth' | 'usdc';
+  rpcUrl?: string;
+  onProgress?: (stage: string, detail?: string) => void;
+}): Promise<PrivateBalanceResult> {
+  const normalizedSlot = normalizeSlot(options.slot);
+  assertPrivateKey(options.rootPrivateKey, 'rootPrivateKey');
+
+  const childPrivateKey = deriveSubaccountChildPrivateKey(options.rootPrivateKey, normalizedSlot);
+  const childKeypair = new Keypair(childPrivateKey);
+
+  return getPrivateBalance({
+    keypair: childKeypair,
+    pool: options.pool,
+    rpcUrl: options.rpcUrl,
+    onProgress: options.onProgress,
+  });
+}
+
 export async function getSubaccountStatus(options: {
   rootPrivateKey: `0x${string}`;
   slot: number;
@@ -247,7 +285,7 @@ export async function getSubaccountStatus(options: {
   const publicClient = createBaseClient(options.rpcUrl);
   const addresses = getAddresses();
 
-  const [deployed, ethWei, usdcWei, ethQueue, usdcQueue] = await Promise.all([
+  const [deployed, ethWei, usdcWei, ethQueue, usdcQueue, ethPrivate, usdcPrivate] = await Promise.all([
     isSubaccountForwarderDeployed({
       forwarderAddress: slot.forwarderAddress,
       rpcUrl: options.rpcUrl,
@@ -269,6 +307,18 @@ export async function getSubaccountStatus(options: {
       pool: 'usdc',
       rpcUrl: options.rpcUrl,
     }),
+    getSubaccountPrivateBalance({
+      rootPrivateKey: options.rootPrivateKey,
+      slot: options.slot,
+      pool: 'eth',
+      rpcUrl: options.rpcUrl,
+    }),
+    getSubaccountPrivateBalance({
+      rootPrivateKey: options.rootPrivateKey,
+      slot: options.slot,
+      pool: 'usdc',
+      rpcUrl: options.rpcUrl,
+    }),
   ]);
 
   return {
@@ -283,6 +333,10 @@ export async function getSubaccountStatus(options: {
         balance: formatUnits(usdcWei, 6),
         balanceWei: usdcWei.toString(),
       },
+    },
+    privateBalances: {
+      eth: toPrivateBalanceStatus(ethPrivate),
+      usdc: toPrivateBalanceStatus(usdcPrivate),
     },
     queues: {
       eth: toQueueStatus('eth', ethQueue),
@@ -477,5 +531,190 @@ export async function buildSubaccountRecoveryTx(options: {
     recipient: options.to,
     tokenAddress,
     signature,
+  };
+}
+
+/**
+ * Merge a subaccount's entire private balance back to the main wallet.
+ *
+ * Builds a ZK transfer proof that moves every unspent UTXO belonging to the
+ * child keypair into a new UTXO encrypted to the parent (root) keypair,
+ * then submits it via the relay.
+ *
+ * @param options - Merge options
+ * @returns Merge result with transaction hash and amount
+ *
+ * @example
+ * ```typescript
+ * const result = await mergeSubaccount({
+ *   rootPrivateKey: process.env.VEIL_KEY as `0x${string}`,
+ *   slot: 0,
+ *   pool: 'eth',
+ * });
+ * console.log(`Merged ${result.amount} — tx: ${result.transactionHash}`);
+ * ```
+ */
+export async function mergeSubaccount(
+  options: SubaccountMergeOptions,
+): Promise<SubaccountMergeResult> {
+  const {
+    rootPrivateKey,
+    slot,
+    pool = 'eth',
+    rpcUrl,
+    relayUrl,
+    onProgress,
+  } = options;
+
+  const normalizedSlot = normalizeSlot(slot);
+  assertPrivateKey(rootPrivateKey, 'rootPrivateKey');
+
+  const poolConfig = POOL_CONFIG[pool];
+  const poolAddress = getPoolAddress(pool);
+
+  // Derive child and parent keypairs
+  const childPrivateKey = deriveSubaccountChildPrivateKey(rootPrivateKey, normalizedSlot);
+  const childKeypair = new Keypair(childPrivateKey);
+  const parentKeypair = new Keypair(rootPrivateKey);
+
+  // Fetch child's private balance
+  onProgress?.('Fetching subaccount balance...');
+  const balanceResult = await getPrivateBalance({
+    keypair: childKeypair,
+    pool,
+    rpcUrl,
+    onProgress,
+  });
+
+  const unspentUtxoInfos = balanceResult.utxos.filter(u => !u.isSpent);
+  if (unspentUtxoInfos.length === 0) {
+    throw new Error('Subaccount has no unspent UTXOs to merge');
+  }
+  if (unspentUtxoInfos.length > 16) {
+    throw new Error(
+      `Subaccount has ${unspentUtxoInfos.length} unspent UTXOs which exceeds the 16-input circuit limit. ` +
+      'Consolidate UTXOs on the subaccount first before merging.',
+    );
+  }
+
+  // Re-decrypt UTXOs to get full Utxo objects
+  onProgress?.('Preparing UTXOs...');
+  const publicClient = createPublicClient({
+    chain: base,
+    transport: http(rpcUrl),
+  });
+
+  const utxos: Utxo[] = [];
+  for (const utxoInfo of unspentUtxoInfos) {
+    const encryptedOutputs = await publicClient.readContract({
+      address: poolAddress,
+      abi: POOL_ABI,
+      functionName: 'getEncryptedOutputs',
+      args: [BigInt(utxoInfo.index), BigInt(utxoInfo.index + 1)],
+    }) as string[];
+
+    if (encryptedOutputs.length > 0) {
+      try {
+        const utxo = Utxo.decrypt(encryptedOutputs[0], childKeypair);
+        utxo.index = utxoInfo.index;
+        utxos.push(utxo);
+      } catch {
+        // Skip if decryption fails
+      }
+    }
+  }
+
+  if (utxos.length === 0) {
+    throw new Error('Failed to decrypt subaccount UTXOs');
+  }
+
+  // Select all UTXOs — transfer the full balance
+  onProgress?.('Selecting UTXOs...');
+  const amount = balanceResult.privateBalance;
+  const { selectedUtxos, changeAmount } = selectUtxosForWithdraw(
+    utxos,
+    amount,
+    poolConfig.decimals,
+  );
+
+  // Create output UTXO encrypted to the parent keypair
+  const outputs: Utxo[] = [];
+  const mergeWei = parseUnits(amount, poolConfig.decimals);
+
+  outputs.push(new Utxo({ amount: mergeWei, keypair: parentKeypair }));
+
+  if (changeAmount > 0n) {
+    outputs.push(new Utxo({ amount: changeAmount, keypair: parentKeypair }));
+  }
+
+  // Fetch all commitments from pool
+  onProgress?.('Fetching commitments...');
+  const nextIndex = await publicClient.readContract({
+    address: poolAddress,
+    abi: POOL_ABI,
+    functionName: 'nextIndex',
+  }) as number;
+
+  const BATCH_SIZE = 5000;
+  const commitments: string[] = [];
+  const totalBatches = Math.ceil(nextIndex / BATCH_SIZE);
+
+  for (let start = 0; start < nextIndex; start += BATCH_SIZE) {
+    const end = Math.min(start + BATCH_SIZE, nextIndex);
+    const batchNum = Math.floor(start / BATCH_SIZE) + 1;
+    onProgress?.('Fetching commitments', `batch ${batchNum}/${totalBatches}`);
+
+    const batch = await publicClient.readContract({
+      address: poolAddress,
+      abi: POOL_ABI,
+      functionName: 'getCommitments',
+      args: [BigInt(start), BigInt(end)],
+    }) as `0x${string}`[];
+
+    commitments.push(...batch.map(c => c.toString()));
+  }
+
+  // Build ZK proof (recipient = 0x0 for in-pool transfer)
+  onProgress?.('Building ZK proof...');
+  const result = await prepareTransaction({
+    commitments,
+    inputs: selectedUtxos,
+    outputs,
+    fee: 0,
+    recipient: '0x0000000000000000000000000000000000000000',
+    relayer: '0x0000000000000000000000000000000000000000',
+    onProgress,
+  });
+
+  // Submit to relay
+  onProgress?.('Submitting to relay...');
+  const relayResult = await submitRelay({
+    type: 'transfer',
+    pool,
+    relayUrl,
+    proofArgs: {
+      proof: result.args.proof,
+      root: result.args.root,
+      inputNullifiers: result.args.inputNullifiers,
+      outputCommitments: result.args.outputCommitments as [string, string],
+      publicAmount: result.args.publicAmount,
+      extDataHash: result.args.extDataHash,
+    },
+    extData: result.extData,
+    metadata: {
+      amount,
+      recipient: 'self',
+      inputUtxoCount: selectedUtxos.length,
+      outputUtxoCount: outputs.length,
+    },
+  });
+
+  return {
+    success: relayResult.success,
+    transactionHash: relayResult.transactionHash,
+    blockNumber: relayResult.blockNumber,
+    amount,
+    slot: normalizedSlot,
+    pool,
   };
 }

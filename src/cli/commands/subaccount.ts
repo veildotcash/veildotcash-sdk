@@ -7,13 +7,14 @@ import {
   getSubaccountStatus,
   isSubaccountForwarderDeployed,
   MAX_SUBACCOUNT_SLOTS,
+  mergeSubaccount,
   sweepSubaccountForwarder,
 } from '../../subaccount.js';
 import { getConfig } from '../config.js';
 import { CLIError, ErrorCode, handleCLIError } from '../errors.js';
 import { printFields, printHeader, printJson, printLine, printList, printSection, txUrl } from '../output.js';
 import { sendTransaction } from '../wallet.js';
-import type { SubaccountAsset } from '../../types.js';
+import type { SubaccountAsset, RelayPool } from '../../types.js';
 
 function parseSlotValue(raw: string): number {
   const normalized = raw.trim();
@@ -51,6 +52,14 @@ function parseAsset(raw: string): SubaccountAsset {
   return asset;
 }
 
+function parsePool(raw: string): RelayPool {
+  const pool = raw.toLowerCase();
+  if (pool !== 'eth' && pool !== 'usdc') {
+    throw new CLIError(ErrorCode.INVALID_AMOUNT, `Unsupported pool: ${raw}. Supported: eth, usdc`);
+  }
+  return pool;
+}
+
 function printQueueHuman(
   title: string,
   queue: {
@@ -81,6 +90,7 @@ Examples:
   veil subaccount status --slot 0
   veil subaccount deploy --slot 0
   veil subaccount sweep --slot 0 --asset eth
+  veil subaccount merge --slot 0 --pool eth
   veil subaccount recover --slot 0 --asset usdc --to 0xRecipientAddress --amount 25
   veil subaccount address --slot 0
 `);
@@ -130,7 +140,7 @@ Examples:
 
   subaccount
     .command('status')
-    .description('Show subaccount deployment, balances, and queue state')
+    .description('Show subaccount deployment, forwarder balances, private balances, and queue state')
     .requiredOption('--slot <n>', 'Subaccount slot', parseSlotValue)
     .option('--json', 'Output as JSON')
     .action(async (options) => {
@@ -160,6 +170,18 @@ Examples:
         printFields([
           { label: 'ETH', value: `${status.balances.eth.balance} ETH` },
           { label: 'USDC', value: `${status.balances.usdc.balance} USDC` },
+        ]);
+
+        printSection('Private Pool Balances');
+        printFields([
+          {
+            label: 'ETH',
+            value: `${status.privateBalances.eth.privateBalance} ETH (${status.privateBalances.eth.unspentCount} unspent / ${status.privateBalances.eth.spentCount} spent / ${status.privateBalances.eth.utxoCount} total UTXOs)`,
+          },
+          {
+            label: 'USDC',
+            value: `${status.privateBalances.usdc.privateBalance} USDC (${status.privateBalances.usdc.unspentCount} unspent / ${status.privateBalances.usdc.spentCount} spent / ${status.privateBalances.usdc.utxoCount} total UTXOs)`,
+          },
         ]);
 
         printQueueHuman('ETH Queue', status.queues.eth);
@@ -251,6 +273,64 @@ Examples:
         ]);
         printLine();
       } catch (error) {
+        handleCLIError(error);
+      }
+    });
+
+  subaccount
+    .command('merge')
+    .description('Merge a subaccount\'s private pool balance back to the main wallet')
+    .requiredOption('--slot <n>', 'Subaccount slot', parseSlotValue)
+    .option('--pool <pool>', 'Pool to merge (eth or usdc)', parsePool, 'eth' as RelayPool)
+    .option('--json', 'Output as JSON')
+    .action(async (options) => {
+      try {
+        const rootPrivateKey = getRequiredVeilKey();
+        const result = await mergeSubaccount({
+          rootPrivateKey,
+          slot: options.slot,
+          pool: options.pool,
+          rpcUrl: process.env.RPC_URL,
+          relayUrl: process.env.RELAY_URL,
+          onProgress: options.json
+            ? undefined
+            : (stage, detail) => {
+                const msg = detail ? `${stage} ${detail}` : stage;
+                process.stderr.write(`\r\x1b[K${msg}`);
+              },
+        });
+
+        if (!options.json) {
+          process.stderr.write('\r\x1b[K');
+        }
+
+        const output = {
+          success: result.success,
+          slot: result.slot,
+          pool: result.pool,
+          amount: result.amount,
+          transactionHash: result.transactionHash,
+          blockNumber: result.blockNumber,
+        };
+
+        if (options.json) {
+          printJson(output);
+          return;
+        }
+
+        printHeader('Subaccount Merge Submitted');
+        printFields([
+          { label: 'Slot', value: result.slot },
+          { label: 'Pool', value: result.pool.toUpperCase() },
+          { label: 'Amount', value: result.amount },
+          { label: 'Transaction', value: txUrl(result.transactionHash) },
+          { label: 'Block', value: result.blockNumber },
+        ]);
+        printLine();
+      } catch (error) {
+        if (!options.json) {
+          process.stderr.write('\r\x1b[K');
+        }
         handleCLIError(error);
       }
     });

@@ -378,6 +378,25 @@ export interface SubaccountBalances {
 }
 
 /**
+ * Private pool balance summary for a specific asset
+ */
+export interface SubaccountPrivateBalanceStatus {
+  privateBalance: string;
+  privateBalanceWei: string;
+  utxoCount: number;
+  spentCount: number;
+  unspentCount: number;
+}
+
+/**
+ * Private pool balances for both supported assets
+ */
+export interface SubaccountPrivateBalances {
+  eth: SubaccountPrivateBalanceStatus;
+  usdc: SubaccountPrivateBalanceStatus;
+}
+
+/**
  * Queue status for a specific asset
  */
 export interface SubaccountQueueStatus {
@@ -395,6 +414,7 @@ export interface SubaccountStatusResult {
   slot: SubaccountSlot;
   deployed: boolean;
   balances: SubaccountBalances;
+  privateBalances: SubaccountPrivateBalances;
   queues: {
     eth: SubaccountQueueStatus;
     usdc: SubaccountQueueStatus;
@@ -425,6 +445,42 @@ export interface SubaccountWithdrawTypedData {
     nonce: bigint;
     deadline: bigint;
   };
+}
+
+/**
+ * Options for merging a subaccount's private balance back to the main wallet
+ */
+export interface SubaccountMergeOptions {
+  /** Root private key (VEIL_KEY) */
+  rootPrivateKey: `0x${string}`;
+  /** Subaccount slot (0-2) */
+  slot: number;
+  /** Pool to merge in (default: 'eth') */
+  pool?: RelayPool;
+  /** Optional RPC URL */
+  rpcUrl?: string;
+  /** Optional relay URL */
+  relayUrl?: string;
+  /** Progress callback */
+  onProgress?: (stage: string, detail?: string) => void;
+}
+
+/**
+ * Result from merging a subaccount's balance to the main wallet
+ */
+export interface SubaccountMergeResult {
+  /** Whether the merge was successful */
+  success: boolean;
+  /** Transaction hash */
+  transactionHash: string;
+  /** Block number of the transaction */
+  blockNumber: string;
+  /** Amount merged (human-readable) */
+  amount: string;
+  /** Subaccount slot that was merged */
+  slot: number;
+  /** Pool the merge was executed in */
+  pool: RelayPool;
 }
 
 /**

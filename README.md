@@ -8,6 +8,8 @@ SDK and CLI for interacting with [Veil Cash](https://veil.cash) privacy pools on
 
 Generate keypairs, register, deposit, withdraw, transfer, and merge ETH and USDC privately.
 
+`0.6.2` adds `mergeSubaccount` — transfer a subaccount's private pool balance back to the main wallet via a ZK proof. Also adds `veil subaccount merge` CLI command.
+
 `0.6.0` adds SDK-first subaccount support for deterministic slot derivation, forwarder status, relay-backed deploy/sweep, and direct recovery.
 
 ## Installation
@@ -86,6 +88,7 @@ veil subaccount derive --slot 0
 veil subaccount status --slot 0
 veil subaccount deploy --slot 0
 veil subaccount sweep --slot 0 --asset eth
+veil subaccount merge --slot 0 --pool eth
 veil subaccount recover --slot 0 --asset usdc --to 0xRecipientAddress --amount 25
 
 # 9. Use JSON or unsigned modes when you need automation
@@ -207,7 +210,7 @@ Subaccounts are deterministic child slots derived from your main `VEIL_KEY`:
 
 `root key -> slot -> child key -> child deposit key -> forwarder`
 
-Base mainnet only. Deploy and sweep are relay-backed. Status reports the forwarder wallet and queue state only, not private pool attribution after queued funds are accepted. Recovery is for assets still sitting on the forwarder after refund or rejection, and is submitted directly on-chain by your CLI gas payer.
+Base mainnet only. Deploy and sweep are relay-backed. Merge transfers the subaccount's private pool balance back to the main wallet via a ZK proof. Status reports forwarder wallet balances, private pool balances, and queue state for the child slot. Recovery is for assets still sitting on the forwarder after refund or rejection, and is submitted directly on-chain by your CLI gas payer.
 
 ```bash
 veil subaccount derive --slot 0
@@ -215,6 +218,7 @@ veil subaccount status --slot 0
 veil subaccount address --slot 0
 veil subaccount deploy --slot 0
 veil subaccount sweep --slot 0 --asset eth
+veil subaccount merge --slot 0 --pool eth
 veil subaccount recover --slot 0 --asset usdc --to 0xRecipientAddress --amount 25
 veil subaccount status --slot 0 --json
 ```
