@@ -178,11 +178,6 @@ Examples:
     .action(async (options) => {
       try {
         const rootPrivateKey = getRequiredVeilKey();
-        const slot = await deriveSubaccountSlot({
-          rootPrivateKey,
-          slot: options.slot,
-          rpcUrl: process.env.RPC_URL,
-        });
         const result = await deploySubaccountForwarder({
           rootPrivateKey,
           slot: options.slot,
@@ -193,7 +188,7 @@ Examples:
         const output = {
           ...result,
           slot: options.slot,
-          forwarderAddress: slot.forwarderAddress,
+          forwarderAddress: result.slot.forwarderAddress,
         };
 
         if (options.json) {
@@ -204,7 +199,7 @@ Examples:
         printHeader('Subaccount Deploy Submitted');
         printFields([
           { label: 'Slot', value: options.slot },
-          { label: 'Forwarder', value: slot.forwarderAddress },
+          { label: 'Forwarder', value: result.slot.forwarderAddress },
           { label: 'Transaction', value: txUrl(result.transactionHash) },
           { label: 'Block', value: result.blockNumber },
         ]);
@@ -273,6 +268,12 @@ Examples:
         const rootPrivateKey = getRequiredVeilKey();
         if (!isAddress(options.to)) {
           throw new CLIError(ErrorCode.INVALID_ADDRESS, `Invalid recipient address: ${options.to}`);
+        }
+        if (!process.env.WALLET_KEY) {
+          throw new CLIError(
+            ErrorCode.WALLET_KEY_MISSING,
+            'WALLET_KEY required for recovery. Recovery submits a transaction on-chain and needs a gas payer.',
+          );
         }
         const config = getConfig({});
         const recovery = await buildSubaccountRecoveryTx({

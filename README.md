@@ -1,8 +1,8 @@
 # @veil-cash/sdk
 
-[![npm version](https://img.shields.io/npm/v/@veil-cash/sdk.svg)](https://www.npmjs.com/package/@veil-cash/sdk)
-[![npm downloads](https://img.shields.io/npm/dm/@veil-cash/sdk.svg)](https://www.npmjs.com/package/@veil-cash/sdk)
-[![license](https://img.shields.io/npm/l/@veil-cash/sdk.svg)](https://github.com/veildotcash/veildotcash-sdk/blob/main/LICENSE)
+[npm version](https://www.npmjs.com/package/@veil-cash/sdk)
+[npm downloads](https://www.npmjs.com/package/@veil-cash/sdk)
+[license](https://github.com/veildotcash/veildotcash-sdk/blob/main/LICENSE)
 
 SDK and CLI for interacting with [Veil Cash](https://veil.cash) privacy pools on Base.
 
@@ -21,13 +21,14 @@ pnpm add @veil-cash/sdk
 ```
 
 For global CLI access:
+
 ```bash
 npm install -g @veil-cash/sdk
 ```
 
 ## Agent Skill
 
-This repo includes a Veil agent skill at [`skills/veil/SKILL.md`](./skills/veil/SKILL.md).
+This repo includes a Veil agent skill at `[skills/veil/SKILL.md](./skills/veil/SKILL.md)`.
 
 Quick mapping:
 
@@ -35,16 +36,18 @@ Quick mapping:
 - CLI binary: `veil`
 - agent skill file: `skills/veil/SKILL.md`
 
-If you are pointing an agent at this repo, send it to [`skills/veil/SKILL.md`](./skills/veil/SKILL.md) for the canonical CLI workflow.
+If you are pointing an agent at this repo, send it to `[skills/veil/SKILL.md](./skills/veil/SKILL.md)` for the canonical CLI workflow.
 
 If you install the npm package, the published package also includes the `skills/` directory so the same skill can be discovered from the installed package contents.
 
 ## Supported Assets
 
-| Asset | Decimals | Token Contract |
-|-------|----------|---------------|
-| ETH | 18 | Native ETH (via WETH) |
-| USDC | 6 | `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` |
+
+| Asset | Decimals | Token Contract                               |
+| ----- | -------- | -------------------------------------------- |
+| ETH   | 18       | Native ETH (via WETH)                        |
+| USDC  | 6        | `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` |
+
 
 ## CLI Quick Start
 
@@ -220,21 +223,25 @@ veil subaccount status --slot 0 --json
 
 The CLI uses two config files:
 
-| File | Purpose |
-|------|---------|
-| `.env.veil` | Veil keypair (VEIL_KEY, DEPOSIT_KEY) - created by `veil init` |
-| `.env` | Wallet config (WALLET_KEY or SIGNER_ADDRESS, RPC_URL) - your existing config |
+
+| File        | Purpose                                                                      |
+| ----------- | ---------------------------------------------------------------------------- |
+| `.env.veil` | Veil keypair (VEIL_KEY, DEPOSIT_KEY) - created by `veil init`                |
+| `.env`      | Wallet config (WALLET_KEY or SIGNER_ADDRESS, RPC_URL) - your existing config |
+
 
 ### Variables
 
-| Variable | Description |
-|----------|-------------|
-| `VEIL_KEY` | Your Veil private key (for ZK proofs, withdrawals, transfers) |
-| `DEPOSIT_KEY` | Your Veil deposit key (public, for register/deposit) |
-| `WALLET_KEY` | Ethereum wallet private key (for signing transactions) |
-| `SIGNER_ADDRESS` | Ethereum address for unsigned/query flows when signing is handled externally |
-| `RPC_URL` | Base RPC URL (optional, defaults to public RPC) |
-| `RELAY_URL` | Override relay base URL for relayed CLI operations, subaccount deploy/sweep, and status checks |
+
+| Variable         | Description                                                                                    |
+| ---------------- | ---------------------------------------------------------------------------------------------- |
+| `VEIL_KEY`       | Your Veil private key (for ZK proofs, withdrawals, transfers)                                  |
+| `DEPOSIT_KEY`    | Your Veil deposit key (public, for register/deposit)                                           |
+| `WALLET_KEY`     | Ethereum wallet private key (for signing transactions)                                         |
+| `SIGNER_ADDRESS` | Ethereum address for unsigned/query flows when signing is handled externally                   |
+| `RPC_URL`        | Base RPC URL (optional, defaults to public RPC)                                                |
+| `RELAY_URL`      | Override relay base URL for relayed CLI operations, subaccount deploy/sweep, and status checks |
+
 
 `WALLET_KEY` and `SIGNER_ADDRESS` are mutually exclusive. Use `WALLET_KEY` for commands that sign transactions, and `SIGNER_ADDRESS` for address-only agent flows like `status`, `balance`, and `register --unsigned`.
 
@@ -252,22 +259,24 @@ Commands print human-readable success output by default. Errors are standardized
 
 ### Error Codes
 
-| Code | Description |
-|------|-------------|
-| `VEIL_KEY_MISSING` | VEIL_KEY not provided |
-| `WALLET_KEY_MISSING` | WALLET_KEY not provided |
-| `DEPOSIT_KEY_MISSING` | DEPOSIT_KEY not provided |
-| `CONFIG_CONFLICT` | Conflicting CLI env vars provided |
-| `INVALID_ADDRESS` | Invalid Ethereum address format |
-| `INVALID_SLOT` | Invalid subaccount slot format |
-| `INVALID_AMOUNT` | Invalid or below minimum amount |
-| `INSUFFICIENT_BALANCE` | Not enough ETH balance |
-| `USER_NOT_REGISTERED` | Recipient not registered in Veil |
-| `NO_UTXOS` | No unspent UTXOs available |
-| `RELAY_ERROR` | Error from relayer service |
-| `RPC_ERROR` | RPC/network error |
-| `CONTRACT_ERROR` | Smart contract reverted |
-| `UNKNOWN_ERROR` | Unexpected error |
+
+| Code                   | Description                       |
+| ---------------------- | --------------------------------- |
+| `VEIL_KEY_MISSING`     | VEIL_KEY not provided             |
+| `WALLET_KEY_MISSING`   | WALLET_KEY not provided           |
+| `DEPOSIT_KEY_MISSING`  | DEPOSIT_KEY not provided          |
+| `CONFIG_CONFLICT`      | Conflicting CLI env vars provided |
+| `INVALID_ADDRESS`      | Invalid Ethereum address format   |
+| `INVALID_SLOT`         | Invalid subaccount slot format    |
+| `INVALID_AMOUNT`       | Invalid or below minimum amount   |
+| `INSUFFICIENT_BALANCE` | Not enough ETH balance            |
+| `USER_NOT_REGISTERED`  | Recipient not registered in Veil  |
+| `NO_UTXOS`             | No unspent UTXOs available        |
+| `RELAY_ERROR`          | Error from relayer service        |
+| `RPC_ERROR`            | RPC/network error                 |
+| `CONTRACT_ERROR`       | Smart contract reverted           |
+| `UNKNOWN_ERROR`        | Unexpected error                  |
+
 
 ## SDK Docs
 

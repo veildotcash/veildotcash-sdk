@@ -64,7 +64,16 @@ export async function postRelayJson<T>(
     body: JSON.stringify(body),
   });
 
-  const data = await response.json();
+  const text = await response.text();
+  let data: unknown;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new RelayError(
+      `Relay returned non-JSON response (HTTP ${response.status})`,
+      response.status,
+    );
+  }
 
   if (!response.ok) {
     const errorData = data as RelayErrorResponse;
