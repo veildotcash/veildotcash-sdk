@@ -307,10 +307,10 @@ Common codes: `VEIL_KEY_MISSING`, `WALLET_KEY_MISSING`, `DEPOSIT_KEY_MISSING`,
 
 | Asset | Minimum (net) | Notes |
 |-------|--------------|-------|
-| ETH | 0.01 | Fee (0.3%) added automatically via on-chain `getDepositAmountWithFee` |
-| USDC | 10 | Fee (0.3%) added automatically via on-chain `getDepositAmountWithFee` |
+| ETH | 0.01 | Fee (0.3%) added automatically, or waived if daily free deposits remain |
+| USDC | 10 | Fee (0.3%) added automatically, or waived if daily free deposits remain |
 
-The CLI amount is the **net** amount that lands in the pool. The fee is calculated on-chain and added to the transaction automatically — users do not need to account for it.
+The CLI amount is the **net** amount that lands in the pool. The CLI checks `getDailyFreeRemaining` on the queue contract — if the user has free slots left today the fee is skipped; otherwise the 0.3% fee is calculated on-chain and added to the transaction automatically.
 
 ---
 

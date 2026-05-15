@@ -109,6 +109,11 @@ keypair.privkey; // '0x...'
 
 ### Transaction Builders
 
+> **Daily free deposits**: Each address gets a configurable number of fee-free
+> deposits per UTC day. The CLI handles this automatically. If you use the
+> builders programmatically, call `getDailyFreeRemaining()` first — when the
+> user has free slots, pass the net amount directly (no fee markup needed).
+
 ```typescript
 import {
   buildRegisterTx, buildChangeDepositKeyTx, buildDepositETHTx, buildDepositTx,
@@ -182,7 +187,7 @@ const mergeResult = await mergeUtxos({
 Balance functions accept an optional `pool` parameter (`'eth'` | `'usdc'`), defaulting to `'eth'`.
 
 ```typescript
-import { getQueueBalance, getPrivateBalance } from '@veil-cash/sdk';
+import { getQueueBalance, getPrivateBalance, getDailyFreeRemaining } from '@veil-cash/sdk';
 
 // Check ETH queue balance (pending deposits)
 const queueBalance = await getQueueBalance({
@@ -195,6 +200,13 @@ const privateBalance = await getPrivateBalance({
   keypair,
   pool: 'usdc',
 });
+
+// Check how many fee-free deposits the user has left today
+const freeRemaining = await getDailyFreeRemaining({
+  address: '0x...',
+  pool: 'eth', // default
+});
+// freeRemaining: number — 0 when all free slots are used or the feature is disabled
 ```
 
 ### Subaccounts
