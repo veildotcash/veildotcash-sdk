@@ -140,6 +140,7 @@ export async function buildTransferProof(
     senderKeypair,
     pool = 'eth',
     rpcUrl,
+    provingKeyPath,
     onProgress,
   } = options;
 
@@ -246,6 +247,7 @@ export async function buildTransferProof(
     recipient: '0x0000000000000000000000000000000000000000',
     relayer: '0x0000000000000000000000000000000000000000',
     onProgress,
+    provingKeyPath,
   });
 
   return {
@@ -338,9 +340,10 @@ export async function mergeUtxos(options: {
   keypair: Keypair;
   pool?: RelayPool;
   rpcUrl?: string;
+  provingKeyPath?: import('./prover.js').ProvingKeyPath;
   onProgress?: (stage: string, detail?: string) => void;
 }): Promise<TransferResult> {
-  const { amount, keypair, pool = 'eth', rpcUrl, onProgress } = options;
+  const { amount, keypair, pool = 'eth', rpcUrl, provingKeyPath, onProgress } = options;
 
   const poolConfig = POOL_CONFIG[pool];
   const poolAddress = getPoolAddress(pool);
@@ -432,6 +435,7 @@ export async function mergeUtxos(options: {
     recipient: '0x0000000000000000000000000000000000000000',
     relayer: '0x0000000000000000000000000000000000000000',
     onProgress,
+    provingKeyPath,
   });
 
   // 6. Submit to relay

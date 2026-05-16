@@ -145,6 +145,7 @@ export async function buildWithdrawProof(
     keypair,
     pool = 'eth',
     rpcUrl,
+    provingKeyPath,
     onProgress,
   } = options;
 
@@ -231,6 +232,7 @@ export async function buildWithdrawProof(
     recipient,
     relayer: '0x0000000000000000000000000000000000000000',
     onProgress,
+    provingKeyPath,
   });
 
   return {

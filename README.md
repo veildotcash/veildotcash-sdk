@@ -288,6 +288,7 @@ Commands print human-readable success output by default. Errors are standardized
 The CLI is the main entrypoint for most users. If you are integrating Veil programmatically, use the dedicated SDK guide:
 
 - [SDK Quick Start and API Reference](./SDK.md)
+- [Browser proof generation](./SDK.md#browser-proof-generation)
 - [AI agent and signer integration notes](./SDK.md#for-ai-agents)
 
 ## Deposit Flow

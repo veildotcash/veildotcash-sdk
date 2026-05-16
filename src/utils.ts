@@ -3,10 +3,10 @@
  * Poseidon hash, hex conversion, and random number generation
  */
 
-import * as crypto from 'crypto';
+import { ethers } from 'ethers';
+import { Buffer } from 'buffer';
+import circomlib from 'circomlib';
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const circomlib = require('circomlib');
 const poseidon = circomlib.poseidon;
 
 /**
@@ -39,7 +39,15 @@ export const poseidonHash2 = (a: bigint | string | number, b: bigint | string | 
  * @returns Random bigint
  */
 export const randomBN = (nbytes: number = 31): bigint => {
-  const bytes = crypto.randomBytes(nbytes);
+  const cryptoApi = (globalThis as unknown as {
+    crypto?: { getRandomValues?: <T extends Uint8Array>(array: T) => T };
+  }).crypto;
+
+  if (!cryptoApi?.getRandomValues) {
+    throw new Error('Secure random number generation is unavailable in this runtime');
+  }
+
+  const bytes = cryptoApi.getRandomValues(new Uint8Array(nbytes));
   let hex = '0x';
   for (let i = 0; i < bytes.length; i++) {
     hex += bytes[i].toString(16).padStart(2, '0');
@@ -106,7 +114,6 @@ export interface ExtDataInput {
  */
 export function getExtDataHash(extData: ExtDataInput): bigint {
   // Use ethers ABI encoder for Solidity-compatible encoding
-  const { ethers } = require('ethers');
   const abi = ethers.AbiCoder.defaultAbiCoder();
 
   // Encode the struct exactly as Solidity would

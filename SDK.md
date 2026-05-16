@@ -182,6 +182,51 @@ const mergeResult = await mergeUtxos({
 });
 ```
 
+### Browser Proof Generation
+
+`withdraw()`, `transfer()`, `mergeUtxos()`, `mergeSubaccount()`, `buildWithdrawProof()`,
+`buildTransferProof()`, and `prepareTransaction()` can generate proofs in browser
+runtimes.
+
+In Node, the SDK uses the packaged `keys/` directory by default. In browsers,
+the SDK defaults to same-origin hosted proving keys:
+
+```text
+/keys/transaction2.wasm
+/keys/transaction2.zkey
+/keys/transaction16.wasm
+/keys/transaction16.zkey
+```
+
+For most web apps, copy the SDK `keys/` files into your app's public assets
+directory. For example, in Next.js/Vite, serving them from `public/keys` makes
+the default path work.
+
+If you host keys elsewhere, pass `provingKeyPath`:
+
+```typescript
+await withdraw({
+  amount: '0.05',
+  recipient: '0xRecipientAddress',
+  keypair,
+  provingKeyPath: 'https://cdn.example.com/veil-keys',
+});
+
+await transfer({
+  amount: '0.02',
+  recipientAddress: '0xRecipientAddress',
+  senderKeypair: keypair,
+  provingKeyPath: (circuitName) => `/static/zk/${circuitName}`,
+});
+```
+
+`provingKeyPath` may be a directory/base URL (`/keys`) or a resolver returning
+the circuit base path without the `.wasm` / `.zkey` extension.
+
+This removes Node `fs` key lookup from the browser proof path. Some bundlers
+may still require standard Node-core polyfills for existing legacy dependencies
+such as `circomlib`, `eth-sig-util`, and `fixed-merkle-tree`.
+
 ### Balance Queries
 
 Balance functions accept an optional `pool` parameter (`'eth'` | `'usdc'`), defaulting to `'eth'`.

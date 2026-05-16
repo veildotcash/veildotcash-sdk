@@ -48,6 +48,7 @@
     "url": "https://github.com/veildotcash/veildotcash-sdk"
   },
   "dependencies": {
+    "buffer": "^6.0.3",
     "circomlib": "github:tornadocash/circomlib#d20d53411d1bef61f38c99a8b36d5d0cc4836aa1",
     "commander": "^14.0.2",
     "dotenv": "^17.2.3",

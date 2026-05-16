@@ -3,6 +3,7 @@
  * Represents a private balance entry that can be spent
  */
 
+import { Buffer } from 'buffer';
 import { Keypair } from './keypair.js';
 import { poseidonHash, toBuffer, randomBN } from './utils.js';
 

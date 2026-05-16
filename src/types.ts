@@ -228,6 +228,13 @@ export interface BuildWithdrawProofOptions {
   pool?: RelayPool;
   /** Optional RPC URL */
   rpcUrl?: string;
+  /**
+   * Optional proving key directory/base URL or resolver.
+   *
+   * Browsers default to `/keys`, expecting files like
+   * `/keys/transaction2.wasm` and `/keys/transaction2.zkey`.
+   */
+  provingKeyPath?: import('./prover.js').ProvingKeyPath;
   /** Progress callback */
   onProgress?: (stage: string, detail?: string) => void;
 }
@@ -246,6 +253,13 @@ export interface BuildTransferProofOptions {
   pool?: RelayPool;
   /** Optional RPC URL */
   rpcUrl?: string;
+  /**
+   * Optional proving key directory/base URL or resolver.
+   *
+   * Browsers default to `/keys`, expecting files like
+   * `/keys/transaction2.wasm` and `/keys/transaction2.zkey`.
+   */
+  provingKeyPath?: import('./prover.js').ProvingKeyPath;
   /** Progress callback */
   onProgress?: (stage: string, detail?: string) => void;
 }
@@ -461,6 +475,13 @@ export interface SubaccountMergeOptions {
   rpcUrl?: string;
   /** Optional relay URL */
   relayUrl?: string;
+  /**
+   * Optional proving key directory/base URL or resolver.
+   *
+   * Browsers default to `/keys`, expecting files like
+   * `/keys/transaction2.wasm` and `/keys/transaction2.zkey`.
+   */
+  provingKeyPath?: import('./prover.js').ProvingKeyPath;
   /** Progress callback */
   onProgress?: (stage: string, detail?: string) => void;
 }

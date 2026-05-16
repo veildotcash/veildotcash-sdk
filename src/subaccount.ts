@@ -563,6 +563,7 @@ export async function mergeSubaccount(
     pool = 'eth',
     rpcUrl,
     relayUrl,
+    provingKeyPath,
     onProgress,
   } = options;
 
@@ -684,6 +685,7 @@ export async function mergeSubaccount(
     recipient: '0x0000000000000000000000000000000000000000',
     relayer: '0x0000000000000000000000000000000000000000',
     onProgress,
+    provingKeyPath,
   });
 
   // Submit to relay
