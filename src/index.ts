@@ -94,6 +94,7 @@ export {
   prove,
   selectCircuit,
   CIRCUIT_CONFIG,
+  setKeyBasePath,
 } from './prover.js';
 export type { ProofInput } from './prover.js';
 

@@ -5,24 +5,56 @@
 
 import { groth16 } from 'snarkjs';
 import { toFixedHex } from './utils.js';
-import * as path from 'path';
-import * as fs from 'fs';
-import { fileURLToPath } from 'url';
 
-// Type definition for ffjavascript utils
-interface FFJavascriptUtils {
-  stringifyBigInts: (obj: unknown) => unknown;
-  unstringifyBigInts: (obj: unknown) => unknown;
+function stringifyBigInts(value: unknown): unknown {
+  if (typeof value === 'bigint') {
+    return value.toString(10);
+  }
+  if (Array.isArray(value)) {
+    return value.map(stringifyBigInts);
+  }
+  if (value && typeof value === 'object') {
+    const result: Record<string, unknown> = {};
+    for (const [key, item] of Object.entries(value)) {
+      result[key] = stringifyBigInts(item);
+    }
+    return result;
+  }
+  return value;
 }
 
-// Dynamic import for ffjavascript
-let utils: FFJavascriptUtils | null = null;
-try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const ffjavascript = require('ffjavascript');
-  utils = ffjavascript.utils;
-} catch {
-  console.warn('ffjavascript not found. Proof generation may not work.');
+/**
+ * Configured base path for circuit key files.
+ * When set, prove() builds paths as `${basePath}/${circuitName}.wasm`
+ * instead of searching the local filesystem.
+ *
+ * Browser integrators should call setKeyBasePath() at app init and
+ * serve the key files as static assets (e.g. "/keys").
+ */
+let _keyBasePath: string | null = null;
+
+/**
+ * Configure where circuit key files are located.
+ *
+ * - Browser: set to a URL path like "/keys" (files served as static assets).
+ *   snarkjs will fetch() them at proof time.
+ * - Node.js: leave unset to auto-detect from the filesystem, or set an
+ *   explicit absolute path to the directory containing the key files.
+ *
+ * @param basePath - URL path or filesystem directory (without trailing slash)
+ *
+ * @example
+ * ```typescript
+ * // Browser — serve keys as static assets
+ * import { setKeyBasePath } from '@veil-cash/sdk';
+ * setKeyBasePath('/keys');
+ *
+ * // Node.js — override auto-detection
+ * setKeyBasePath('/opt/veil/circuit-keys');
+ * ```
+ */
+export function setKeyBasePath(basePath: string): void {
+  _keyBasePath = basePath.replace(/\/+$/, '');
 }
 
 /**
@@ -63,22 +95,29 @@ interface ProveResult {
 }
 
 /**
- * Find the keys directory containing circuit files
- * Works in both development and installed package scenarios
+ * Find the keys directory containing circuit files.
+ * Only called in Node.js when no keyBasePath is configured.
  */
 function findKeysDirectory(): string {
-  // Try multiple possible locations
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const path = require('path') as typeof import('path');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const fs = require('fs') as typeof import('fs');
+
   const possiblePaths = [
-    // When running from package (installed via npm)
-    path.resolve(__dirname, '..', 'keys'),
-    path.resolve(__dirname, '..', '..', 'keys'),
-    // When running from source
     path.resolve(process.cwd(), 'keys'),
-    // ESM module path
   ];
 
-  // Try to get module directory for ESM
+  if (typeof __dirname !== 'undefined') {
+    possiblePaths.unshift(
+      path.resolve(__dirname, '..', 'keys'),
+      path.resolve(__dirname, '..', '..', 'keys'),
+    );
+  }
+
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { fileURLToPath } = require('url') as typeof import('url');
     const currentFilePath = fileURLToPath(import.meta.url);
     const currentDir = path.dirname(currentFilePath);
     possiblePaths.unshift(path.resolve(currentDir, '..', 'keys'));
@@ -93,7 +132,8 @@ function findKeysDirectory(): string {
   }
 
   throw new Error(
-    'Circuit keys not found. Expected to find keys/ directory with transaction2.wasm and transaction2.zkey files.'
+    'Circuit keys not found. Expected to find keys/ directory with transaction2.wasm and transaction2.zkey files. ' +
+    'In a browser environment, call setKeyBasePath() before generating proofs.'
   );
 }
 
@@ -111,26 +151,33 @@ function findKeysDirectory(): string {
  * ```
  */
 export async function prove(input: ProofInput, circuitName: string): Promise<string> {
-  if (!utils) {
-    throw new Error('ffjavascript is required for proof generation. Please install it: npm install ffjavascript');
+  let wasmPath: string;
+  let zkeyPath: string;
+
+  if (_keyBasePath !== null) {
+    wasmPath = `${_keyBasePath}/${circuitName}.wasm`;
+    zkeyPath = `${_keyBasePath}/${circuitName}.zkey`;
+  } else {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const path = require('path') as typeof import('path');
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const fs = require('fs') as typeof import('fs');
+
+    const keysDir = findKeysDirectory();
+    wasmPath = path.join(keysDir, `${circuitName}.wasm`);
+    zkeyPath = path.join(keysDir, `${circuitName}.zkey`);
+
+    if (!fs.existsSync(wasmPath)) {
+      throw new Error(`Circuit WASM file not found: ${wasmPath}`);
+    }
+    if (!fs.existsSync(zkeyPath)) {
+      throw new Error(`Circuit zkey file not found: ${zkeyPath}`);
+    }
   }
 
-  const keysDir = findKeysDirectory();
-  const wasmPath = path.join(keysDir, `${circuitName}.wasm`);
-  const zkeyPath = path.join(keysDir, `${circuitName}.zkey`);
-
-  // Verify files exist
-  if (!fs.existsSync(wasmPath)) {
-    throw new Error(`Circuit WASM file not found: ${wasmPath}`);
-  }
-  if (!fs.existsSync(zkeyPath)) {
-    throw new Error(`Circuit zkey file not found: ${zkeyPath}`);
-  }
-
-  // Generate proof using snarkjs
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const result = await groth16.fullProve(
-    utils.stringifyBigInts(input) as any,
+    stringifyBigInts(input) as any,
     wasmPath,
     zkeyPath,
     undefined,

@@ -3,11 +3,38 @@
  * Poseidon hash, hex conversion, and random number generation
  */
 
-import * as crypto from 'crypto';
+import * as circomlib from 'circomlib';
+import { ethers } from 'ethers';
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const circomlib = require('circomlib');
-const poseidon = circomlib.poseidon;
+type Poseidon = (items: (bigint | string | number)[]) => { toString: () => string };
+
+const poseidon = (
+  'poseidon' in circomlib
+    ? circomlib.poseidon
+    : (circomlib as { default?: { poseidon?: Poseidon } }).default?.poseidon
+) as Poseidon | undefined;
+
+if (!poseidon) {
+  throw new Error('circomlib poseidon export not found');
+}
+
+function getRandomBytes(nbytes: number): Uint8Array {
+  const webCrypto = (globalThis as typeof globalThis & {
+    crypto?: { getRandomValues<T extends Uint8Array>(array: T): T };
+  }).crypto;
+
+  if (webCrypto?.getRandomValues) {
+    return webCrypto.getRandomValues(new Uint8Array(nbytes));
+  }
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const nodeCrypto = require('crypto') as { randomBytes: (size: number) => Uint8Array };
+    return nodeCrypto.randomBytes(nbytes);
+  } catch {
+    throw new Error('Secure random source unavailable');
+  }
+}
 
 /**
  * SNARK scalar field size
@@ -39,7 +66,7 @@ export const poseidonHash2 = (a: bigint | string | number, b: bigint | string | 
  * @returns Random bigint
  */
 export const randomBN = (nbytes: number = 31): bigint => {
-  const bytes = crypto.randomBytes(nbytes);
+  const bytes = getRandomBytes(nbytes);
   let hex = '0x';
   for (let i = 0; i < bytes.length; i++) {
     hex += bytes[i].toString(16).padStart(2, '0');
@@ -56,7 +83,7 @@ export const randomBN = (nbytes: number = 31): bigint => {
 export function toFixedHex(number: bigint | string | number | Buffer, length: number = 32): string {
   let hexValue: string;
   
-  if (number instanceof Buffer) {
+  if (typeof Buffer !== 'undefined' && number instanceof Buffer) {
     hexValue = number.toString('hex');
   } else {
     let bigIntValue = BigInt(number as bigint | string | number);
@@ -105,8 +132,6 @@ export interface ExtDataInput {
  * @returns Hash as bigint (mod FIELD_SIZE)
  */
 export function getExtDataHash(extData: ExtDataInput): bigint {
-  // Use ethers ABI encoder for Solidity-compatible encoding
-  const { ethers } = require('ethers');
   const abi = ethers.AbiCoder.defaultAbiCoder();
 
   // Encode the struct exactly as Solidity would
