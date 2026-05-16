@@ -20,9 +20,7 @@ export const VEIL_SIGNED_MESSAGE = "Sign this message to create your Veil Wallet
  */
 export type MessageSigner = (message: string) => Promise<string>;
 
-// eth-sig-util for x25519 encryption
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const ethSigUtil = require('eth-sig-util');
+import * as ethSigUtil from 'eth-sig-util';
 
 /**
  * Pack encrypted message into hex string
