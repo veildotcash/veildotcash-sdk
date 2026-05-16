@@ -93,7 +93,7 @@ veil subaccount recover --slot 0 --asset usdc --to 0xRecipientAddress --amount 2
 
 # 9. Use JSON or unsigned modes when you need automation
 veil status --json
-veil deposit ETH 0.1 --unsigned
+veil deposit ETH 0.1 --unsigned --address 0x...
 veil subaccount status --slot 0 --json
 ```
 
@@ -148,7 +148,8 @@ Deposit ETH or USDC into Veil. The amount you specify is the **net** amount that
 veil deposit ETH 0.1            # 0.1 ETH lands in pool (free or ~0.1003 ETH sent)
 veil deposit USDC 100           # 100 USDC lands in pool (free or ~100.30 USDC sent)
 veil deposit ETH 0.1 --json
-veil deposit ETH 0.1 --unsigned
+veil deposit ETH 0.1 --unsigned --address 0x...
+SIGNER_ADDRESS=0x... veil deposit ETH 0.1 --unsigned
 ```
 
 ### Balances

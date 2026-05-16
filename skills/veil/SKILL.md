@@ -165,7 +165,7 @@ What do you want to do?
 |
 +-- Register deposit key on-chain     → veil register [--unsigned]
 |
-+-- Deposit ETH or USDC               → veil deposit <asset> <amount> [--unsigned]
++-- Deposit ETH or USDC               → veil deposit <asset> <amount> [--unsigned --address 0x...]
 |
 +-- Check balances                    → veil balance [queue|private] [--pool eth|usdc]
 |
@@ -340,8 +340,8 @@ are accepted into the private pool. This typically takes around `10-15 minutes`.
 veil deposit ETH 0.1
 veil deposit USDC 100
 veil deposit ETH 0.1 --json
-veil deposit ETH 0.1 --unsigned
-veil deposit USDC 100 --unsigned
+veil deposit ETH 0.1 --unsigned --address 0x...
+SIGNER_ADDRESS=0x... veil deposit USDC 100 --unsigned
 ```
 
 Minimums:

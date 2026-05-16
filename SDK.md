@@ -303,8 +303,8 @@ veil init --json
 
 # Get unsigned transaction payloads for agent signing
 SIGNER_ADDRESS=0x... veil register --unsigned
-veil deposit ETH 0.1 --unsigned
-veil deposit USDC 100 --unsigned    # Outputs approve + deposit payloads
+SIGNER_ADDRESS=0x... veil deposit ETH 0.1 --unsigned
+veil deposit USDC 100 --unsigned --address 0x...    # Outputs approve + deposit payloads
 
 # Request machine-readable status or balances
 veil balance --json
@@ -356,12 +356,13 @@ Use `--unsigned` to get signer-compatible transaction payloads:
 ```bash
 SIGNER_ADDRESS=0x... veil register --unsigned
 SIGNER_ADDRESS=0x... veil register --unsigned --force
-veil deposit ETH 0.1 --unsigned
+SIGNER_ADDRESS=0x... veil deposit ETH 0.1 --unsigned
+veil deposit ETH 0.1 --unsigned --address 0x...
 # {"to":"0x...","data":"0x...","value":"100000000000000000","chainId":8453}
 ```
 
 The `--unsigned` flag outputs a standard `{to, data, value, chainId}` payload compatible with any signer that accepts arbitrary transactions.
-When `SIGNER_ADDRESS` is set, `veil register --unsigned` no longer requires the `--address` flag.
+When `SIGNER_ADDRESS` is set, `veil register --unsigned` and `veil deposit --unsigned` no longer require the `--address` flag.
 For `veil register --unsigned --force`, the CLI checks on-chain registration state first and emits `changeDepositKey` only when the address is already registered; otherwise it falls back to `register`.
 
 ### Programmatic SDK Usage

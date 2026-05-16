@@ -14,6 +14,7 @@ import { clearProgress, createProgressReporter, printFields, printHeader, printJ
 import { POOL_CONFIG, getAddresses } from '../../addresses.js';
 import { ENTRY_ABI, ERC20_ABI } from '../../abi.js';
 import type { TransactionData } from '../../types.js';
+import type { WalletConfig } from '../wallet.js';
 
 const MINIMUM_NET: Record<string, number> = {
   ETH: 0.01,
@@ -59,6 +60,7 @@ export function createDepositCommand(): Command {
     .description('Deposit ETH or USDC into Veil')
     .argument('<asset>', 'Asset to deposit (ETH or USDC)')
     .argument('<amount>', 'Amount to deposit — this is what arrives in your Veil balance')
+    .option('--address <address>', 'Signer address (required in --unsigned mode unless SIGNER_ADDRESS or WALLET_KEY is set)')
     .option('--unsigned', 'Output unsigned transaction payload instead of sending')
     .option('--json', 'Output as JSON')
     .addHelpText('after', `
@@ -69,7 +71,8 @@ free daily deposits (fee waived). The CLI checks automatically.
 Examples:
   veil deposit ETH 0.1          # deposits 0.1 ETH (free or ~0.1003 ETH)
   veil deposit USDC 100         # deposits 100 USDC (free or ~100.30 USDC)
-  veil deposit ETH 0.1 --unsigned
+  veil deposit ETH 0.1 --unsigned --address 0x...
+  SIGNER_ADDRESS=0x... veil deposit ETH 0.1 --unsigned
   veil deposit ETH 0.1 --json
 `)
     .action(async (asset: string, amount: string, options) => {
@@ -99,18 +102,32 @@ Examples:
 
         const progress = createProgressReporter();
 
-        // Resolve depositor address early so we can check daily free deposits.
-        // Available from WALLET_KEY or SIGNER_ADDRESS; absent in pure --unsigned flows.
-        const resolved = resolveAddress({}, { required: false });
-        const depositor = resolved?.address;
+        let config: WalletConfig | null = null;
+        let address: `0x${string}`;
+        let feeRpcUrl = rpcUrl;
+
+        if (options.unsigned) {
+          const resolved = resolveAddress({ address: options.address }, { required: true });
+          if (!resolved) {
+            throw new CLIError(
+              ErrorCode.WALLET_KEY_MISSING,
+              'Must provide --address, set SIGNER_ADDRESS, or set WALLET_KEY env.',
+            );
+          }
+          address = resolved.address;
+        } else {
+          config = getConfig(options);
+          address = getAddress(config.privateKey);
+          feeRpcUrl = config.rpcUrl;
+        }
 
         progress('Checking deposit fee...');
 
         const { grossWei, feeWei, dailyFreeUsed, dailyFreeRemaining } = await getGrossAmount(
           netWei,
-          depositor ?? '0x0000000000000000000000000000000000000000',
+          address,
           pool,
-          rpcUrl,
+          feeRpcUrl,
         );
         const grossStr = assetUpper === 'ETH'
           ? formatEther(grossWei)
@@ -163,8 +180,9 @@ Examples:
           return;
         }
 
-        const config = getConfig(options);
-        const address = getAddress(config.privateKey);
+        if (!config) {
+          throw new CLIError(ErrorCode.WALLET_KEY_MISSING, 'WALLET_KEY env var required. Set it before running this command.');
+        }
 
         if (assetUpper === 'ETH') {
           progress('Checking balance...');
