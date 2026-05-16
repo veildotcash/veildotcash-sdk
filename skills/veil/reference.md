@@ -258,8 +258,8 @@ SIGNER_ADDRESS=0x... veil register --unsigned --force # Unsigned register/change
 veil register --unsigned --address 0x...           # Unsigned register payload (explicit address)
 veil register --json                               # Register and output result as JSON
 
-veil deposit ETH 0.1 --unsigned                    # Unsigned ETH deposit payload
-veil deposit USDC 100 --unsigned                   # Unsigned USDC deposit payload(s)
+veil deposit ETH 0.1 --unsigned --address 0x...    # Unsigned ETH deposit payload
+SIGNER_ADDRESS=0x... veil deposit USDC 100 --unsigned # Unsigned USDC deposit payload(s)
 veil deposit ETH 0.1 --json                        # Deposit and output result as JSON
 
 veil balance                                       # All pool balances
@@ -307,10 +307,10 @@ Common codes: `VEIL_KEY_MISSING`, `WALLET_KEY_MISSING`, `DEPOSIT_KEY_MISSING`,
 
 | Asset | Minimum (net) | Notes |
 |-------|--------------|-------|
-| ETH | 0.01 | Fee (0.3%) added automatically via on-chain `getDepositAmountWithFee` |
-| USDC | 10 | Fee (0.3%) added automatically via on-chain `getDepositAmountWithFee` |
+| ETH | 0.01 | Fee (0.3%) added automatically, or waived if daily free deposits remain |
+| USDC | 10 | Fee (0.3%) added automatically, or waived if daily free deposits remain |
 
-The CLI amount is the **net** amount that lands in the pool. The fee is calculated on-chain and added to the transaction automatically — users do not need to account for it.
+The CLI amount is the **net** amount that lands in the pool. The CLI checks `getDailyFreeRemaining` on the queue contract — if the user has free slots left today the fee is skipped; otherwise the 0.3% fee is calculated on-chain and added to the transaction automatically.
 
 ---
 

@@ -128,6 +128,54 @@ export async function getQueueBalance(options: {
 }
 
 /**
+ * Get remaining daily free deposits for an address.
+ * Returns 0 if the queue contract has not been upgraded to V3 yet
+ * or if the daily free feature is disabled.
+ *
+ * @param options - Query options
+ * @param options.address - Depositor address to check
+ * @param options.pool - Pool identifier ('eth' or 'usdc', default: 'eth')
+ * @param options.rpcUrl - Optional RPC URL
+ * @returns Number of free deposits remaining today
+ *
+ * @example
+ * ```typescript
+ * const remaining = await getDailyFreeRemaining({
+ *   address: '0x...',
+ *   pool: 'eth',
+ * });
+ * console.log(`Free deposits left today: ${remaining}`);
+ * ```
+ */
+export async function getDailyFreeRemaining(options: {
+  address: `0x${string}`;
+  pool?: RelayPool;
+  rpcUrl?: string;
+}): Promise<number> {
+  const { address, pool = 'eth', rpcUrl } = options;
+  const queueAddress = getQueueAddress(pool);
+
+  const publicClient = createPublicClient({
+    chain: base,
+    transport: http(rpcUrl),
+  });
+
+  try {
+    const remaining = await publicClient.readContract({
+      address: queueAddress,
+      abi: QUEUE_ABI,
+      functionName: 'getDailyFreeRemaining',
+      args: [address],
+    }) as bigint;
+
+    return Number(remaining);
+  } catch {
+    // V2 contracts don't have this function — treat as 0 remaining
+    return 0;
+  }
+}
+
+/**
  * Get private balance from the Pool contract
  * Decrypts all encrypted outputs, calculates nullifiers, and checks spent status
  * 

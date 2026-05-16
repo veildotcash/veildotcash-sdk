@@ -53,6 +53,7 @@ export {
 export {
   getQueueBalance,
   getPrivateBalance,
+  getDailyFreeRemaining,
 } from './balance.js';
 export type { ProgressCallback } from './balance.js';
 

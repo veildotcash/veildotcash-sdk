@@ -4,8 +4,9 @@
 
 import { Command } from 'commander';
 import { buildDepositETHTx, buildDepositUSDCTx, buildApproveUSDCTx } from '../../deposit.js';
+import { getDailyFreeRemaining } from '../../balance.js';
 import { sendTransaction, getAddress, getBalance } from '../wallet.js';
-import { getConfig } from '../config.js';
+import { getConfig, resolveAddress } from '../config.js';
 import { createPublicClient, http, parseEther, parseUnits, formatEther, formatUnits } from 'viem';
 import { base } from 'viem/chains';
 import { handleCLIError, CLIError, ErrorCode } from '../errors.js';
@@ -13,6 +14,7 @@ import { clearProgress, createProgressReporter, printFields, printHeader, printJ
 import { POOL_CONFIG, getAddresses } from '../../addresses.js';
 import { ENTRY_ABI, ERC20_ABI } from '../../abi.js';
 import type { TransactionData } from '../../types.js';
+import type { WalletConfig } from '../wallet.js';
 
 const MINIMUM_NET: Record<string, number> = {
   ETH: 0.01,
@@ -20,13 +22,22 @@ const MINIMUM_NET: Record<string, number> = {
 };
 
 /**
- * Query the Entry contract for the exact gross amount (net + fee).
- * This matches the contract's own fee math and avoids rounding mismatches.
+ * Compute the gross amount and fee for a deposit.
+ * Checks daily free deposit availability first — if the user has
+ * free slots remaining the fee is waived and gross === net.
  */
 async function getGrossAmount(
   netWei: bigint,
+  depositor: `0x${string}`,
+  pool: 'eth' | 'usdc',
   rpcUrl: string | undefined,
-): Promise<{ grossWei: bigint; feeWei: bigint }> {
+): Promise<{ grossWei: bigint; feeWei: bigint; dailyFreeUsed: boolean; dailyFreeRemaining: number }> {
+  const freeRemaining = await getDailyFreeRemaining({ address: depositor, pool, rpcUrl });
+
+  if (freeRemaining > 0) {
+    return { grossWei: netWei, feeWei: 0n, dailyFreeUsed: true, dailyFreeRemaining: freeRemaining - 1 };
+  }
+
   const publicClient = createPublicClient({
     chain: base,
     transport: http(rpcUrl),
@@ -39,7 +50,7 @@ async function getGrossAmount(
     args: [netWei],
   }) as bigint;
 
-  return { grossWei, feeWei: grossWei - netWei };
+  return { grossWei, feeWei: grossWei - netWei, dailyFreeUsed: false, dailyFreeRemaining: 0 };
 }
 
 const SUPPORTED_ASSETS = ['ETH', 'USDC'];
@@ -49,16 +60,19 @@ export function createDepositCommand(): Command {
     .description('Deposit ETH or USDC into Veil')
     .argument('<asset>', 'Asset to deposit (ETH or USDC)')
     .argument('<amount>', 'Amount to deposit — this is what arrives in your Veil balance')
+    .option('--address <address>', 'Signer address (required in --unsigned mode unless SIGNER_ADDRESS or WALLET_KEY is set)')
     .option('--unsigned', 'Output unsigned transaction payload instead of sending')
     .option('--json', 'Output as JSON')
     .addHelpText('after', `
 The amount you specify is the net amount that lands in your Veil balance.
-The 0.3% protocol fee is automatically added on top.
+A 0.3% protocol fee is normally added on top, but each address gets
+free daily deposits (fee waived). The CLI checks automatically.
 
 Examples:
-  veil deposit ETH 0.1          # deposits 0.1 ETH (sends ~0.1003 ETH)
-  veil deposit USDC 100         # deposits 100 USDC (sends ~100.30 USDC)
-  veil deposit ETH 0.1 --unsigned
+  veil deposit ETH 0.1          # deposits 0.1 ETH (free or ~0.1003 ETH)
+  veil deposit USDC 100         # deposits 100 USDC (free or ~100.30 USDC)
+  veil deposit ETH 0.1 --unsigned --address 0x...
+  SIGNER_ADDRESS=0x... veil deposit ETH 0.1 --unsigned
   veil deposit ETH 0.1 --json
 `)
     .action(async (asset: string, amount: string, options) => {
@@ -80,15 +94,41 @@ Examples:
         }
 
         const rpcUrl = process.env.RPC_URL;
-        const poolConfig = POOL_CONFIG[assetUpper.toLowerCase() as 'eth' | 'usdc'];
+        const pool = assetUpper.toLowerCase() as 'eth' | 'usdc';
+        const poolConfig = POOL_CONFIG[pool];
         const netWei = assetUpper === 'ETH'
           ? parseEther(amount)
           : parseUnits(amount, poolConfig.decimals);
 
         const progress = createProgressReporter();
-        progress('Calculating fee...');
 
-        const { grossWei, feeWei } = await getGrossAmount(netWei, rpcUrl);
+        let config: WalletConfig | null = null;
+        let address: `0x${string}`;
+        let feeRpcUrl = rpcUrl;
+
+        if (options.unsigned) {
+          const resolved = resolveAddress({ address: options.address }, { required: true });
+          if (!resolved) {
+            throw new CLIError(
+              ErrorCode.WALLET_KEY_MISSING,
+              'Must provide --address, set SIGNER_ADDRESS, or set WALLET_KEY env.',
+            );
+          }
+          address = resolved.address;
+        } else {
+          config = getConfig(options);
+          address = getAddress(config.privateKey);
+          feeRpcUrl = config.rpcUrl;
+        }
+
+        progress('Checking deposit fee...');
+
+        const { grossWei, feeWei, dailyFreeUsed, dailyFreeRemaining } = await getGrossAmount(
+          netWei,
+          address,
+          pool,
+          feeRpcUrl,
+        );
         const grossStr = assetUpper === 'ETH'
           ? formatEther(grossWei)
           : formatUnits(grossWei, poolConfig.decimals);
@@ -140,8 +180,9 @@ Examples:
           return;
         }
 
-        const config = getConfig(options);
-        const address = getAddress(config.privateKey);
+        if (!config) {
+          throw new CLIError(ErrorCode.WALLET_KEY_MISSING, 'WALLET_KEY env var required. Set it before running this command.');
+        }
 
         if (assetUpper === 'ETH') {
           progress('Checking balance...');
@@ -203,6 +244,7 @@ Examples:
           asset: assetUpper,
           amount,
           fee: feeStr,
+          dailyFreeUsed,
           totalSent: grossStr,
           blockNumber: result.receipt.blockNumber.toString(),
         };
@@ -212,11 +254,15 @@ Examples:
           return;
         }
 
+        const feeLabel = dailyFreeUsed
+          ? `0 ${assetUpper} (free — ${dailyFreeRemaining} remaining today)`
+          : `${feeStr} ${assetUpper} (0.3%)`;
+
         printHeader('Deposit Submitted');
         printFields([
           { label: 'Asset', value: assetUpper },
           { label: 'Amount', value: `${amount} ${assetUpper}` },
-          { label: 'Fee', value: `${feeStr} ${assetUpper} (0.3%)` },
+          { label: 'Fee', value: feeLabel },
           { label: 'Total sent', value: `${grossStr} ${assetUpper}` },
           { label: 'From', value: address },
           { label: 'Transaction', value: txUrl(result.hash) },

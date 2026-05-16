@@ -165,7 +165,7 @@ What do you want to do?
 |
 +-- Register deposit key on-chain     → veil register [--unsigned]
 |
-+-- Deposit ETH or USDC               → veil deposit <asset> <amount> [--unsigned]
++-- Deposit ETH or USDC               → veil deposit <asset> <amount> [--unsigned --address 0x...]
 |
 +-- Check balances                    → veil balance [queue|private] [--pool eth|usdc]
 |
@@ -330,7 +330,9 @@ Important:
   - If not yet registered, returns a normal `register` payload.
 
 Deposits treat the CLI amount as the **net** amount that lands in the pool.
-The `0.3%` protocol fee is calculated on-chain and added automatically.
+Each address gets a configurable number of fee-free deposits per UTC day.
+The CLI checks automatically — if free slots remain the fee is waived;
+otherwise the `0.3%` protocol fee is calculated on-chain and added.
 After submission, deposits go through screening / queue processing before they
 are accepted into the private pool. This typically takes around `10-15 minutes`.
 
@@ -338,8 +340,8 @@ are accepted into the private pool. This typically takes around `10-15 minutes`.
 veil deposit ETH 0.1
 veil deposit USDC 100
 veil deposit ETH 0.1 --json
-veil deposit ETH 0.1 --unsigned
-veil deposit USDC 100 --unsigned
+veil deposit ETH 0.1 --unsigned --address 0x...
+SIGNER_ADDRESS=0x... veil deposit USDC 100 --unsigned
 ```
 
 Minimums:

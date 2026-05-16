@@ -218,6 +218,14 @@ export const QUEUE_ABI = [
     stateMutability: 'view',
     type: 'function',
   },
+  // Get remaining daily free deposits for an address (V3+)
+  {
+    inputs: [{ name: '_depositor', type: 'address' }],
+    name: 'getDailyFreeRemaining',
+    outputs: [{ name: 'remaining', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
 ] as const;
 
 /**
