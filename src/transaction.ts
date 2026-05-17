@@ -4,7 +4,7 @@
  */
 
 import { buildMerkleTree, MERKLE_TREE_HEIGHT } from './merkle.js';
-import { prove, selectCircuit, type ProofInput } from './prover.js';
+import { prove, selectCircuit, type ProofInput, type ProvingKeyPath } from './prover.js';
 import { toFixedHex, getExtDataHash, shuffle, FIELD_SIZE } from './utils.js';
 import { Utxo } from './utxo.js';
 
@@ -58,6 +58,8 @@ export interface PrepareTransactionParams {
   relayer?: string | bigint | number;
   /** Optional progress callback */
   onProgress?: (stage: string, detail?: string) => void;
+  /** Optional proving key directory/base URL or circuit path resolver */
+  provingKeyPath?: ProvingKeyPath;
 }
 
 /**
@@ -72,6 +74,7 @@ interface GetProofParams {
   recipient: string | bigint;
   relayer: string | bigint;
   onProgress?: (stage: string, detail?: string) => void;
+  provingKeyPath?: ProvingKeyPath;
 }
 
 async function getProof({
@@ -83,6 +86,7 @@ async function getProof({
   recipient,
   relayer,
   onProgress,
+  provingKeyPath,
 }: GetProofParams): Promise<TransactionResult> {
   // Shuffle inputs and outputs for privacy
   inputs = shuffle([...inputs]);
@@ -160,7 +164,7 @@ async function getProof({
 
   // Select circuit based on input count and generate proof
   const circuitName = selectCircuit(inputs.length);
-  const proof = await prove(proofInput, circuitName);
+  const proof = await prove(proofInput, circuitName, { provingKeyPath });
 
   // Build proof arguments for on-chain verification
   const args: ProofArgs = {
@@ -218,6 +222,7 @@ export async function prepareTransaction({
   recipient = 0,
   relayer = 0,
   onProgress,
+  provingKeyPath,
 }: PrepareTransactionParams): Promise<TransactionResult> {
   // Validate input/output counts
   if (inputs.length > 16 || outputs.length > 2) {
@@ -254,6 +259,7 @@ export async function prepareTransaction({
     recipient: String(recipient),
     relayer: String(relayer),
     onProgress,
+    provingKeyPath,
   });
 
   return result;

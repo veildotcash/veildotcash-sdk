@@ -96,7 +96,7 @@ export {
   selectCircuit,
   CIRCUIT_CONFIG,
 } from './prover.js';
-export type { ProofInput } from './prover.js';
+export type { ProofInput, ProveOptions, ProvingKeyPath } from './prover.js';
 
 // Addresses and config
 export { 

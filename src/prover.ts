@@ -4,10 +4,8 @@
  */
 
 import { groth16 } from 'snarkjs';
+import { utils } from 'ffjavascript';
 import { toFixedHex } from './utils.js';
-import * as path from 'path';
-import * as fs from 'fs';
-import { fileURLToPath } from 'url';
 
 // Type definition for ffjavascript utils
 interface FFJavascriptUtils {
@@ -15,15 +13,7 @@ interface FFJavascriptUtils {
   unstringifyBigInts: (obj: unknown) => unknown;
 }
 
-// Dynamic import for ffjavascript
-let utils: FFJavascriptUtils | null = null;
-try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const ffjavascript = require('ffjavascript');
-  utils = ffjavascript.utils;
-} catch {
-  console.warn('ffjavascript not found. Proof generation may not work.');
-}
+const ffUtils = utils as FFJavascriptUtils;
 
 /**
  * Input data for ZK proof generation
@@ -63,18 +53,69 @@ interface ProveResult {
 }
 
 /**
+ * Directory/base URL where proving keys are hosted, or a resolver that returns
+ * the circuit base path without the `.wasm` / `.zkey` extension.
+ */
+export type ProvingKeyPath = string | ((circuitName: string) => string);
+
+export interface ProveOptions {
+  /**
+   * Proving key location.
+   *
+   * In Node this defaults to the package/source `keys` directory. In browsers
+   * this defaults to `/keys`, so apps can serve `/keys/transaction2.wasm` and
+   * `/keys/transaction2.zkey` from their own origin.
+   */
+  provingKeyPath?: ProvingKeyPath;
+  /** Force snarkjs single-threaded proving. Defaults to true. */
+  singleThread?: boolean;
+}
+
+function isBrowserRuntime(): boolean {
+  return !(typeof process !== 'undefined' && !!process.versions?.node);
+}
+
+function stripTrailingSlash(value: string): string {
+  return value.endsWith('/') ? value.slice(0, -1) : value;
+}
+
+function normalizeCircuitBasePath(provingKeyPath: ProvingKeyPath, circuitName: string): string {
+  const resolvedPath =
+    typeof provingKeyPath === 'function' ? provingKeyPath(circuitName) : provingKeyPath;
+
+  const withoutExtension = resolvedPath.replace(/\.(wasm|zkey)$/i, '');
+  if (withoutExtension.endsWith(`/${circuitName}`) || withoutExtension.endsWith(`\\${circuitName}`)) {
+    return withoutExtension;
+  }
+
+  return `${stripTrailingSlash(withoutExtension)}/${circuitName}`;
+}
+
+function importNodeModule<T>(specifier: string): Promise<T> {
+  const dynamicImport = new Function('specifier', 'return import(specifier)') as (
+    specifier: string
+  ) => Promise<T>;
+  return dynamicImport(specifier);
+}
+
+/**
  * Find the keys directory containing circuit files
  * Works in both development and installed package scenarios
  */
-function findKeysDirectory(): string {
+async function findNodeKeysDirectory(): Promise<string> {
+  const [{ existsSync }, pathModule, { fileURLToPath }] = await Promise.all([
+    importNodeModule<typeof import('node:fs')>('node:fs'),
+    importNodeModule<typeof import('node:path')>('node:path'),
+    importNodeModule<typeof import('node:url')>('node:url'),
+  ]);
+  const path = pathModule;
+
   // Try multiple possible locations
   const possiblePaths = [
     // When running from package (installed via npm)
-    path.resolve(__dirname, '..', 'keys'),
-    path.resolve(__dirname, '..', '..', 'keys'),
+    path.resolve(process.cwd(), 'node_modules', '@veil-cash', 'sdk', 'keys'),
     // When running from source
     path.resolve(process.cwd(), 'keys'),
-    // ESM module path
   ];
 
   // Try to get module directory for ESM
@@ -83,11 +124,11 @@ function findKeysDirectory(): string {
     const currentDir = path.dirname(currentFilePath);
     possiblePaths.unshift(path.resolve(currentDir, '..', 'keys'));
   } catch {
-    // Not ESM environment, use __dirname
+    // Ignore non-file module URLs.
   }
 
   for (const p of possiblePaths) {
-    if (fs.existsSync(p) && fs.existsSync(path.join(p, 'transaction2.wasm'))) {
+    if (existsSync(p) && existsSync(path.join(p, 'transaction2.wasm'))) {
       return p;
     }
   }
@@ -95,6 +136,46 @@ function findKeysDirectory(): string {
   throw new Error(
     'Circuit keys not found. Expected to find keys/ directory with transaction2.wasm and transaction2.zkey files.'
   );
+}
+
+async function resolveProvingKeyPaths(
+  circuitName: string,
+  provingKeyPath?: ProvingKeyPath,
+): Promise<{ wasmPath: string; zkeyPath: string }> {
+  if (provingKeyPath) {
+    const circuitBasePath = normalizeCircuitBasePath(provingKeyPath, circuitName);
+    return {
+      wasmPath: `${circuitBasePath}.wasm`,
+      zkeyPath: `${circuitBasePath}.zkey`,
+    };
+  }
+
+  if (isBrowserRuntime()) {
+    return {
+      wasmPath: `/keys/${circuitName}.wasm`,
+      zkeyPath: `/keys/${circuitName}.zkey`,
+    };
+  }
+
+  const keysDir = await findNodeKeysDirectory();
+  return {
+    wasmPath: `${keysDir}/${circuitName}.wasm`,
+    zkeyPath: `${keysDir}/${circuitName}.zkey`,
+  };
+}
+
+async function assertNodeKeyFilesExist(wasmPath: string, zkeyPath: string): Promise<void> {
+  if (isBrowserRuntime() || wasmPath.startsWith('http://') || wasmPath.startsWith('https://')) {
+    return;
+  }
+
+  const { existsSync } = await importNodeModule<typeof import('node:fs')>('node:fs');
+  if (!existsSync(wasmPath)) {
+    throw new Error(`Circuit WASM file not found: ${wasmPath}`);
+  }
+  if (!existsSync(zkeyPath)) {
+    throw new Error(`Circuit zkey file not found: ${zkeyPath}`);
+  }
 }
 
 /**
@@ -110,32 +191,23 @@ function findKeysDirectory(): string {
  * // Returns: 0x1234...abcd (256 bytes hex)
  * ```
  */
-export async function prove(input: ProofInput, circuitName: string): Promise<string> {
-  if (!utils) {
-    throw new Error('ffjavascript is required for proof generation. Please install it: npm install ffjavascript');
-  }
-
-  const keysDir = findKeysDirectory();
-  const wasmPath = path.join(keysDir, `${circuitName}.wasm`);
-  const zkeyPath = path.join(keysDir, `${circuitName}.zkey`);
-
-  // Verify files exist
-  if (!fs.existsSync(wasmPath)) {
-    throw new Error(`Circuit WASM file not found: ${wasmPath}`);
-  }
-  if (!fs.existsSync(zkeyPath)) {
-    throw new Error(`Circuit zkey file not found: ${zkeyPath}`);
-  }
+export async function prove(
+  input: ProofInput,
+  circuitName: string,
+  options: ProveOptions = {},
+): Promise<string> {
+  const { wasmPath, zkeyPath } = await resolveProvingKeyPaths(circuitName, options.provingKeyPath);
+  await assertNodeKeyFilesExist(wasmPath, zkeyPath);
 
   // Generate proof using snarkjs
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const result = await groth16.fullProve(
-    utils.stringifyBigInts(input) as any,
+    ffUtils.stringifyBigInts(input) as any,
     wasmPath,
     zkeyPath,
     undefined,
     undefined,
-    { singleThread: true },
+    { singleThread: options.singleThread ?? true },
   );
   const proof = result.proof as unknown as SnarkProof;
 

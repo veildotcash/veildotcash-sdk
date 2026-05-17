@@ -4,7 +4,9 @@
  */
 
 import { ethers } from 'ethers';
+import { Buffer } from 'buffer';
 import { privateKeyToAccount } from 'viem/accounts';
+import ethSigUtil from 'eth-sig-util';
 import { poseidonHash, toFixedHex } from './utils.js';
 import type { EncryptedMessage } from './types.js';
 
@@ -19,10 +21,6 @@ export const VEIL_SIGNED_MESSAGE = "Sign this message to create your Veil Wallet
  * Used with Keypair.fromSigner() to support external signing services.
  */
 export type MessageSigner = (message: string) => Promise<string>;
-
-// eth-sig-util for x25519 encryption
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const ethSigUtil = require('eth-sig-util');
 
 /**
  * Pack encrypted message into hex string
