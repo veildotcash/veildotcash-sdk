@@ -6,8 +6,9 @@ declare module 'ffjavascript' {
 }
 
 declare module 'circomlib' {
+  export const poseidon: (items: Array<bigint | string | number>) => { toString: () => string };
   const circomlib: {
-    poseidon: (items: Array<bigint | string | number>) => { toString: () => string };
+    poseidon: typeof poseidon;
   };
   export default circomlib;
 }
@@ -15,14 +16,18 @@ declare module 'circomlib' {
 declare module 'eth-sig-util' {
   import type { EncryptedMessage } from './types.js';
 
+  export function getEncryptionPublicKey(privateKey: string): string;
+  export function encrypt(
+    receiverPublicKey: string,
+    msgParams: { data: string },
+    version: 'x25519-xsalsa20-poly1305'
+  ): EncryptedMessage;
+  export function decrypt(encryptedData: EncryptedMessage, receiverPrivateKey: string): string;
+
   const ethSigUtil: {
-    getEncryptionPublicKey: (privateKey: string) => string;
-    encrypt: (
-      receiverPublicKey: string,
-      msgParams: { data: string },
-      version: 'x25519-xsalsa20-poly1305'
-    ) => EncryptedMessage;
-    decrypt: (encryptedData: EncryptedMessage, receiverPrivateKey: string) => string;
+    getEncryptionPublicKey: typeof getEncryptionPublicKey;
+    encrypt: typeof encrypt;
+    decrypt: typeof decrypt;
   };
   export default ethSigUtil;
 }

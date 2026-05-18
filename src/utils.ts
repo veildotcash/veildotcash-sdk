@@ -5,7 +5,7 @@
 
 import { ethers } from 'ethers';
 import { Buffer } from 'buffer';
-import circomlib from 'circomlib';
+import { circomlib } from './compat.js';
 
 const poseidon = circomlib.poseidon;
 
