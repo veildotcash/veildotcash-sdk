@@ -6,7 +6,7 @@
 import { ethers } from 'ethers';
 import { Buffer } from 'buffer';
 import { privateKeyToAccount } from 'viem/accounts';
-import ethSigUtil from 'eth-sig-util';
+import { ethSigUtil } from './compat.js';
 import { poseidonHash, toFixedHex } from './utils.js';
 import type { EncryptedMessage } from './types.js';
 
