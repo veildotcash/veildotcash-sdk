@@ -12,7 +12,7 @@ import {
 } from 'viem';
 import { privateKeyToAccount, privateKeyToAddress } from 'viem/accounts';
 import { base } from 'viem/chains';
-import { ADDRESSES } from './addresses.js';
+import { ADDRESSES, getRelayUrl } from './addresses.js';
 import { Keypair } from './keypair.js';
 import { submitRelay } from './relay.js';
 import { buildWithdrawProof } from './withdraw.js';
@@ -197,7 +197,9 @@ export async function payX402Resource(options: PayX402ResourceOptions): Promise<
   const relayResult = await submitRelay({
     type: 'withdraw',
     pool: 'usdc',
-    relayUrl: options.relayUrl,
+    // x402 funding must target the low-minimum /x402 relay route. Default to it
+    // so direct SDK consumers do not silently hit the main relay's 5 USDC floor.
+    relayUrl: options.relayUrl ?? `${getRelayUrl()}/x402`,
     proofArgs: proof.proofArgs,
     extData: proof.extData,
     metadata: {
