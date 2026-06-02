@@ -68,13 +68,18 @@ export {
 export {
   deriveX402PayerKey,
   deriveX402PayerAddress,
+  getX402PayerBalances,
   payX402Resource,
   selectBaseUsdcExactRequirement,
   usdcAtomicToDecimalString,
+  usdcDecimalToAtomic,
 } from './x402.js';
 export type {
+  GetX402PayerBalancesOptions,
   PayX402ResourceOptions,
   PayX402ResourceResult,
+  X402PayerBalance,
+  X402PayerFundedInfo,
 } from './x402.js';
 
 // Transfer functions

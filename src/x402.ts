@@ -9,10 +9,12 @@ import {
   http,
   isAddress,
   keccak256,
+  parseUnits,
 } from 'viem';
 import { privateKeyToAccount, privateKeyToAddress } from 'viem/accounts';
 import { base } from 'viem/chains';
-import { ADDRESSES, getRelayUrl } from './addresses.js';
+import { ADDRESSES, POOL_CONFIG, getRelayUrl } from './addresses.js';
+import { ERC20_ABI } from './abi.js';
 import { Keypair } from './keypair.js';
 import { submitRelay } from './relay.js';
 import { buildWithdrawProof } from './withdraw.js';
@@ -20,6 +22,7 @@ import type { ProvingKeyPath } from './prover.js';
 
 const X402_PAYER_DOMAIN = 'veil-x402-payer';
 const BASE_NETWORK = `eip155:${ADDRESSES.chainId}` as const;
+const USDC_DECIMALS = POOL_CONFIG.usdc.decimals;
 
 export interface PayX402ResourceOptions {
   url: string;
@@ -27,10 +30,33 @@ export interface PayX402ResourceOptions {
   payerIndex: bigint | number | string;
   rpcUrl?: string;
   relayUrl?: string;
+  /**
+   * Maximum USDC the caller will pay for this resource, as a human-readable
+   * decimal string (e.g. "0.10" or "10"). If the merchant's x402 requirement
+   * exceeds this cap, the payment is rejected before any proof is built or the
+   * payer EOA is funded. Prefer setting a tight per-request cap.
+   */
+  maxPayment?: string;
   fetchImpl?: typeof fetch;
   init?: RequestInit;
   provingKeyPath?: ProvingKeyPath;
   onProgress?: (stage: string, detail?: string) => void;
+  /**
+   * Fired immediately after the payer EOA is funded by the relay, before the
+   * x402 payment is signed and submitted. Lets callers persist a funded-state
+   * record so that funds are traceable even if a later step (signing, the second
+   * fetch, settle-header parse) fails. Best-effort: callback errors are ignored.
+   */
+  onPayerFunded?: (info: X402PayerFundedInfo) => void;
+}
+
+export interface X402PayerFundedInfo {
+  payerAddress: `0x${string}`;
+  payerIndex: string;
+  amount: string;
+  amountAtomic: string;
+  relayTransactionHash: string;
+  relayBlockNumber: string;
 }
 
 export interface PayX402ResourceResult {
@@ -76,7 +102,17 @@ function normalizeAtomicAmount(amount: string): string {
 
 export function usdcAtomicToDecimalString(amountAtomic: string | bigint): string {
   const atomic = typeof amountAtomic === 'bigint' ? amountAtomic.toString() : normalizeAtomicAmount(amountAtomic);
-  return formatUnits(BigInt(atomic), 6);
+  return formatUnits(BigInt(atomic), USDC_DECIMALS);
+}
+
+/**
+ * Convert a human-readable USDC amount (e.g. "10" or "0.10") to atomic units.
+ */
+export function usdcDecimalToAtomic(amount: string): bigint {
+  if (!/^\d+(\.\d+)?$/.test(amount.trim())) {
+    throw new Error(`Invalid USDC amount: ${amount}`);
+  }
+  return parseUnits(amount.trim(), USDC_DECIMALS);
 }
 
 export function deriveX402PayerKey(
@@ -184,6 +220,17 @@ export async function payX402Resource(options: PayX402ResourceOptions): Promise<
   const amountAtomic = normalizeAtomicAmount(requirement.amount);
   const amount = usdcAtomicToDecimalString(amountAtomic);
 
+  // Enforce the spend cap before building a proof or funding the payer EOA so a
+  // merchant cannot raise prices between calls and drain more than intended.
+  if (options.maxPayment !== undefined) {
+    const maxAtomic = usdcDecimalToAtomic(options.maxPayment);
+    if (BigInt(amountAtomic) > maxAtomic) {
+      throw new Error(
+        `x402 payment of ${amount} USDC exceeds maxPayment cap of ${usdcAtomicToDecimalString(maxAtomic)} USDC. Payment was not sent.`,
+      );
+    }
+  }
+
   options.onProgress?.('Funding x402 payer...', `${amount} USDC to ${payerAccount.address}`);
   const proof = await buildWithdrawProof({
     amount,
@@ -212,6 +259,23 @@ export async function payX402Resource(options: PayX402ResourceOptions): Promise<
       payerIndex: payerIndex.toString(),
     },
   });
+
+  // The payer is now funded. Notify the caller before signing so a funded-state
+  // record can be persisted even if a later step throws and strands funds.
+  if (options.onPayerFunded) {
+    try {
+      options.onPayerFunded({
+        payerAddress: payerAccount.address,
+        payerIndex: payerIndex.toString(),
+        amount,
+        amountAtomic,
+        relayTransactionHash: relayResult.transactionHash,
+        relayBlockNumber: relayResult.blockNumber,
+      });
+    } catch {
+      // Best-effort notification; never let a logging callback abort the payment.
+    }
+  }
 
   options.onProgress?.('Signing x402 payment...');
   const paymentPayload = await httpClient.createPaymentPayload({
@@ -248,4 +312,66 @@ export async function payX402Resource(options: PayX402ResourceOptions): Promise<
     paymentResponse,
     paymentTransactionHash: paymentResponse?.transaction,
   };
+}
+
+export interface X402PayerBalance {
+  payerIndex: string;
+  payerAddress: `0x${string}`;
+  usdc: string;
+  usdcAtomic: string;
+}
+
+export interface GetX402PayerBalancesOptions {
+  rootPrivateKey: `0x${string}`;
+  startIndex?: bigint | number | string;
+  count?: number;
+  rpcUrl?: string;
+  /** When true, only return payers that currently hold a non-zero USDC balance. */
+  nonZeroOnly?: boolean;
+}
+
+/**
+ * Inspect Base USDC balances held by deterministic x402 payer EOAs over an index
+ * range. Useful for surfacing dust or funds left on a payer when a payment failed
+ * after funding. This is read-only; it does not move funds or reuse payers.
+ */
+export async function getX402PayerBalances(
+  options: GetX402PayerBalancesOptions,
+): Promise<X402PayerBalance[]> {
+  assertPrivateKey(options.rootPrivateKey, 'rootPrivateKey');
+  const start = normalizePayerIndex(options.startIndex ?? 0n);
+  const count = options.count ?? 16;
+  if (!Number.isInteger(count) || count <= 0 || count > 256) {
+    throw new Error('count must be an integer between 1 and 256');
+  }
+
+  const publicClient = createPublicClient({
+    chain: base,
+    transport: http(options.rpcUrl),
+  });
+
+  const results: X402PayerBalance[] = [];
+  for (let i = 0; i < count; i++) {
+    const index = start + BigInt(i);
+    const payerAddress = deriveX402PayerAddress(options.rootPrivateKey, index);
+    const balance = (await publicClient.readContract({
+      address: ADDRESSES.usdcToken,
+      abi: ERC20_ABI,
+      functionName: 'balanceOf',
+      args: [payerAddress],
+    })) as bigint;
+
+    if (options.nonZeroOnly && balance === 0n) {
+      continue;
+    }
+
+    results.push({
+      payerIndex: index.toString(),
+      payerAddress,
+      usdc: formatUnits(balance, USDC_DECIMALS),
+      usdcAtomic: balance.toString(),
+    });
+  }
+
+  return results;
 }

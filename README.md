@@ -219,6 +219,7 @@ const result = await payX402Resource({
   url: 'https://merchant.example/paid-resource',
   rootPrivateKey: process.env.VEIL_KEY as `0x${string}`,
   payerIndex: 0n,
+  maxPayment: '0.10', // reject if the resource demands more than 0.10 USDC
   relayUrl: process.env.X402_RELAY_URL,
   rpcUrl: process.env.RPC_URL,
 });
@@ -228,9 +229,14 @@ console.log(result.response.status, result.payerAddress);
 
 The helper withdraws the exact x402 amount to a deterministic fresh payer EOA,
 then signs a standard x402 v2 Base USDC `exact` payment from that EOA. Use a
-new `payerIndex` per payment. The withdrawal and payment legs are public and can
-be correlated by amount and timing, but the source private balance remains
-hidden.
+new `payerIndex` per payment. Pass `maxPayment` (a decimal USDC string) to cap
+exposure; the payment is rejected before any funds move if the requirement
+exceeds the cap. The withdrawal and payment legs are public and can be correlated
+by amount and timing, but the source private balance remains hidden.
+
+To surface funds left on a payer after a failed payment, use
+`getX402PayerBalances({ rootPrivateKey, startIndex, count, nonZeroOnly })`, which
+returns the Base USDC balance of each derived payer EOA. It is read-only.
 
 ### Subaccounts
 

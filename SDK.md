@@ -215,6 +215,7 @@ const result = await payX402Resource({
   url: 'https://merchant.example/paid-resource',
   rootPrivateKey: process.env.VEIL_KEY as `0x${string}`,
   payerIndex: 42n,
+  maxPayment: '0.10', // cap exposure; reject if the resource demands more
   relayUrl: process.env.X402_RELAY_URL,
   rpcUrl: process.env.RPC_URL,
   onProgress: (stage, detail) => console.log(stage, detail),
@@ -229,9 +230,16 @@ console.log({
 ```
 
 The payer key uses the `veil-x402-payer` derivation domain, separate from
-subaccounts. Use a fresh, persisted `payerIndex` for each payment. The helper
-currently supports x402 v2 `exact` requirements on Base mainnet USDC only; it
-rejects other assets, networks, and schemes.
+subaccounts. Use a fresh, persisted `payerIndex` for each payment. Set
+`maxPayment` (a decimal USDC string) to cap exposure; the payment is rejected
+before any funds move if the requirement exceeds the cap. The helper currently
+supports x402 v2 `exact` requirements on Base mainnet USDC only; it rejects other
+assets, networks, and schemes.
+
+`getX402PayerBalances({ rootPrivateKey, startIndex, count, nonZeroOnly })`
+inspects the Base USDC balance held by each derived payer EOA, which is useful
+for surfacing funds left on a payer after a failed payment. It is read-only and
+does not move funds.
 
 ### Browser Proof Generation
 
