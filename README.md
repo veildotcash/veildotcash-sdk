@@ -8,6 +8,8 @@ SDK and CLI for interacting with [Veil Cash](https://veil.cash) privacy pools on
 
 Generate keypairs, register, deposit, withdraw, transfer, and merge ETH and USDC privately.
 
+`0.7.0` adds Coinbase-compatible x402 payments from private USDC balances via deterministic fresh payer EOAs.
+
 `0.6.2` adds `mergeSubaccount` — transfer a subaccount's private pool balance back to the main wallet via a ZK proof. Also adds `veil subaccount merge` CLI command.
 
 `0.6.0` adds SDK-first subaccount support for deterministic slot derivation, forwarder status, relay-backed deploy/sweep, and direct recovery.
@@ -91,7 +93,10 @@ veil subaccount sweep --slot 0 --asset eth
 veil subaccount merge --slot 0 --pool eth
 veil subaccount recover --slot 0 --asset usdc --to 0xRecipientAddress --amount 25
 
-# 9. Use JSON or unsigned modes when you need automation
+# 9. Pay an x402 resource from private USDC in application code
+# See SDK.md for payX402Resource().
+
+# 10. Use JSON or unsigned modes when you need automation
 veil status --json
 veil deposit ETH 0.1 --unsigned --address 0x...
 veil subaccount status --slot 0 --json
@@ -204,6 +209,28 @@ veil merge ETH 0.1
 veil merge USDC 100
 veil merge ETH 0.1 --json
 ```
+
+Pay a Coinbase-compatible x402 resource from private USDC:
+
+```typescript
+import { payX402Resource } from '@veil-cash/sdk';
+
+const result = await payX402Resource({
+  url: 'https://merchant.example/paid-resource',
+  rootPrivateKey: process.env.VEIL_KEY as `0x${string}`,
+  payerIndex: 0n,
+  relayUrl: process.env.X402_RELAY_URL,
+  rpcUrl: process.env.RPC_URL,
+});
+
+console.log(result.response.status, result.payerAddress);
+```
+
+The helper withdraws the exact x402 amount to a deterministic fresh payer EOA,
+then signs a standard x402 v2 Base USDC `exact` payment from that EOA. Use a
+new `payerIndex` per payment. The withdrawal and payment legs are public and can
+be correlated by amount and timing, but the source private balance remains
+hidden.
 
 ### Subaccounts
 

@@ -44,7 +44,9 @@ export const randomBN = (nbytes: number = 31): bigint => {
   }).crypto;
 
   if (!cryptoApi?.getRandomValues) {
-    throw new Error('Secure random number generation is unavailable in this runtime');
+    throw new Error(
+      'Secure random number generation is unavailable. Provide globalThis.crypto.getRandomValues in this runtime.'
+    );
   }
 
   const bytes = cryptoApi.getRandomValues(new Uint8Array(nbytes));

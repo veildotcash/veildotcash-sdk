@@ -64,6 +64,19 @@ export {
   selectUtxosForWithdraw,
 } from './withdraw.js';
 
+// x402 payment helpers
+export {
+  deriveX402PayerKey,
+  deriveX402PayerAddress,
+  payX402Resource,
+  selectBaseUsdcExactRequirement,
+  usdcAtomicToDecimalString,
+} from './x402.js';
+export type {
+  PayX402ResourceOptions,
+  PayX402ResourceResult,
+} from './x402.js';
+
 // Transfer functions
 export {
   transfer,

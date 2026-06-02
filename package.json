@@ -1,6 +1,6 @@
 {
   "name": "@veil-cash/sdk",
-  "version": "0.6.5",
+  "version": "0.7.0",
   "description": "SDK and CLI for interacting with Veil Cash privacy pools - keypair generation, deposits, and status checking",
   "type": "module",
   "main": "./dist/index.js",
@@ -48,6 +48,9 @@
     "url": "https://github.com/veildotcash/veildotcash-sdk"
   },
   "dependencies": {
+    "@x402/core": "^2.14.0",
+    "@x402/evm": "^2.14.0",
+    "@x402/fetch": "^2.14.0",
     "buffer": "^6.0.3",
     "circomlib": "github:tornadocash/circomlib#d20d53411d1bef61f38c99a8b36d5d0cc4836aa1",
     "commander": "^14.0.2",

@@ -11,6 +11,7 @@ import {
   Keypair, buildRegisterTx, buildDepositETHTx,
   buildDepositUSDCTx, buildApproveUSDCTx,
   withdraw, transfer, getSubaccountStatus, mergeSubaccount,
+  payX402Resource,
 } from '@veil-cash/sdk';
 import { createWalletClient, http } from 'viem';
 import { base } from 'viem/chains';
@@ -72,6 +73,14 @@ const subaccount = await getSubaccountStatus({
 });
 console.log(subaccount.slot.forwarderAddress);
 
+// 8. Pay an x402 resource from private USDC
+const paid = await payX402Resource({
+  url: 'https://merchant.example/paid-resource',
+  rootPrivateKey: keypair.privkey as `0x${string}`,
+  payerIndex: 0n,
+  relayUrl: process.env.X402_RELAY_URL,
+});
+console.log(paid.response.status, paid.payerAddress);
 ```
 
 ## SDK API Reference
@@ -181,6 +190,48 @@ const mergeResult = await mergeUtxos({
   pool: 'eth',
 });
 ```
+
+### x402 Payments
+
+`payX402Resource()` pays standard x402 v2 Base USDC `exact` resources from a
+private Veil USDC balance while remaining compatible with Coinbase-facilitated
+merchants.
+
+```typescript
+import {
+  deriveX402PayerAddress,
+  payX402Resource,
+  usdcAtomicToDecimalString,
+} from '@veil-cash/sdk';
+
+const payerAddress = deriveX402PayerAddress(
+  process.env.VEIL_KEY as `0x${string}`,
+  42n,
+);
+
+const amount = usdcAtomicToDecimalString('1000'); // "0.001"
+
+const result = await payX402Resource({
+  url: 'https://merchant.example/paid-resource',
+  rootPrivateKey: process.env.VEIL_KEY as `0x${string}`,
+  payerIndex: 42n,
+  relayUrl: process.env.X402_RELAY_URL,
+  rpcUrl: process.env.RPC_URL,
+  onProgress: (stage, detail) => console.log(stage, detail),
+});
+
+console.log({
+  status: result.response.status,
+  payerAddress: result.payerAddress,
+  relayTx: result.relayTransactionHash,
+  paymentTx: result.paymentTransactionHash,
+});
+```
+
+The payer key uses the `veil-x402-payer` derivation domain, separate from
+subaccounts. Use a fresh, persisted `payerIndex` for each payment. The helper
+currently supports x402 v2 `exact` requirements on Base mainnet USDC only; it
+rejects other assets, networks, and schemes.
 
 ### Browser Proof Generation
 

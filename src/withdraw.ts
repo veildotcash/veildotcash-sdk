@@ -272,7 +272,7 @@ export async function buildWithdrawProof(
 export async function withdraw(
   options: BuildWithdrawProofOptions
 ): Promise<WithdrawResult> {
-  const { amount, recipient, pool = 'eth', onProgress } = options;
+  const { amount, recipient, pool = 'eth', onProgress, relayUrl } = options;
 
   // Build the proof
   const proof = await buildWithdrawProof(options);
@@ -282,6 +282,7 @@ export async function withdraw(
   const relayResult = await submitRelay({
     type: 'withdraw',
     pool,
+    relayUrl,
     proofArgs: proof.proofArgs,
     extData: proof.extData,
     metadata: {
