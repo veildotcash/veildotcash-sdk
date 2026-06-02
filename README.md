@@ -234,6 +234,15 @@ exposure; the payment is rejected before any funds move if the requirement
 exceeds the cap. The withdrawal and payment legs are public and can be correlated
 by amount and timing, but the source private balance remains hidden.
 
+Use `quoteX402Resource({ url, rpcUrl, maxPayment, init })` to probe a resource
+for its price and payment requirement without funding a payer or paying. It
+returns the parsed requirement for a supported `402` or the raw status/body
+otherwise.
+
+If a payment is funded but delivery fails, the USDC stays on the payer EOA. Retry
+with `reuseExistingBalance: true` and the same `payerIndex` to pay from that
+balance without a second withdrawal; it throws if the balance is insufficient.
+
 To surface funds left on a payer after a failed payment, use
 `getX402PayerBalances({ rootPrivateKey, startIndex, count, nonZeroOnly })`, which
 returns the Base USDC balance of each derived payer EOA. It is read-only.

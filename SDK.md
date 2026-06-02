@@ -236,6 +236,20 @@ before any funds move if the requirement exceeds the cap. The helper currently
 supports x402 v2 `exact` requirements on Base mainnet USDC only; it rejects other
 assets, networks, and schemes.
 
+`quoteX402Resource({ url, rpcUrl, maxPayment, init })` probes a resource without
+funding a payer or signing a payment. For a supported `402` it returns the price
+and requirement (`amount`, `amountAtomic`, `payTo`, `network`, `asset`, and
+`exceedsMax` when `maxPayment` is set); for any other status it returns the raw
+`status` and parsed `body`. Use it to validate a request and confirm cost before
+committing a withdrawal. A merchant that validates the request body only after
+payment will still return `402` here, so a quote cannot catch post-payment errors.
+
+To retry a payment whose funding succeeded but whose delivery failed (the USDC is
+still on the payer EOA), pass `reuseExistingBalance: true` with the same
+`payerIndex`. When the payer already holds at least the required amount,
+`payX402Resource` skips the withdrawal and pays directly from that balance
+(`relayTransactionHash` is empty); it throws if the balance is insufficient.
+
 `getX402PayerBalances({ rootPrivateKey, startIndex, count, nonZeroOnly })`
 inspects the Base USDC balance held by each derived payer EOA, which is useful
 for surfacing funds left on a payer after a failed payment. It is read-only and

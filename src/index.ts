@@ -70,6 +70,7 @@ export {
   deriveX402PayerAddress,
   getX402PayerBalances,
   payX402Resource,
+  quoteX402Resource,
   selectBaseUsdcExactRequirement,
   usdcAtomicToDecimalString,
   usdcDecimalToAtomic,
@@ -78,6 +79,8 @@ export type {
   GetX402PayerBalancesOptions,
   PayX402ResourceOptions,
   PayX402ResourceResult,
+  QuoteX402ResourceOptions,
+  QuoteX402ResourceResult,
   X402PayerBalance,
   X402PayerFundedInfo,
 } from './x402.js';

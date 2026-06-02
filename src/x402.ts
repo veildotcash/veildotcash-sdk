@@ -48,6 +48,13 @@ export interface PayX402ResourceOptions {
    * fetch, settle-header parse) fails. Best-effort: callback errors are ignored.
    */
   onPayerFunded?: (info: X402PayerFundedInfo) => void;
+  /**
+   * When true, if the derived payer EOA already holds >= the required amount,
+   * skip the relay-funded withdrawal and pay directly from that balance. Use to
+   * retry a payment whose funding succeeded but whose delivery failed, without
+   * burning a second withdrawal. Throws if the payer's balance is insufficient.
+   */
+  reuseExistingBalance?: boolean;
 }
 
 export interface X402PayerFundedInfo {
@@ -231,49 +238,77 @@ export async function payX402Resource(options: PayX402ResourceOptions): Promise<
     }
   }
 
-  options.onProgress?.('Funding x402 payer...', `${amount} USDC to ${payerAccount.address}`);
-  const proof = await buildWithdrawProof({
-    amount,
-    recipient: payerAccount.address,
-    keypair: new Keypair(options.rootPrivateKey),
-    pool: 'usdc',
-    rpcUrl: options.rpcUrl,
-    provingKeyPath: options.provingKeyPath,
-    onProgress: options.onProgress,
-  });
-  const relayResult = await submitRelay({
-    type: 'withdraw',
-    pool: 'usdc',
-    // x402 funding must target the low-minimum /x402 relay route. Default to it
-    // so direct SDK consumers do not silently hit the main relay's 5 USDC floor.
-    relayUrl: options.relayUrl ?? `${getRelayUrl()}/x402`,
-    proofArgs: proof.proofArgs,
-    extData: proof.extData,
-    metadata: {
-      amount,
-      amountAtomic,
-      recipient: payerAccount.address,
-      inputUtxoCount: proof.inputCount,
-      outputUtxoCount: proof.outputCount,
-      x402: true,
-      payerIndex: payerIndex.toString(),
-    },
-  });
+  // Decide whether to fund a fresh withdrawal or reuse an existing payer balance.
+  // Reuse lets a caller retry a payment whose funding succeeded but whose delivery
+  // failed (the USDC is still sitting on the payer EOA) without a second withdrawal.
+  let relayTransactionHash = '';
+  let relayBlockNumber = '';
+  let skipFunding = false;
+  if (options.reuseExistingBalance) {
+    const payerBalance = (await publicClient.readContract({
+      address: ADDRESSES.usdcToken,
+      abi: ERC20_ABI,
+      functionName: 'balanceOf',
+      args: [payerAccount.address],
+    })) as bigint;
+    if (payerBalance >= BigInt(amountAtomic)) {
+      skipFunding = true;
+    } else {
+      throw new Error(
+        `Cannot reuse payer index ${payerIndex.toString()}: holds ${formatUnits(payerBalance, USDC_DECIMALS)} USDC but the resource requires ${amount} USDC.`,
+      );
+    }
+  }
 
-  // The payer is now funded. Notify the caller before signing so a funded-state
-  // record can be persisted even if a later step throws and strands funds.
-  if (options.onPayerFunded) {
-    try {
-      options.onPayerFunded({
-        payerAddress: payerAccount.address,
-        payerIndex: payerIndex.toString(),
+  if (skipFunding) {
+    options.onProgress?.('Reusing funded x402 payer...', `${amount} USDC on ${payerAccount.address}`);
+  } else {
+    options.onProgress?.('Funding x402 payer...', `${amount} USDC to ${payerAccount.address}`);
+    const proof = await buildWithdrawProof({
+      amount,
+      recipient: payerAccount.address,
+      keypair: new Keypair(options.rootPrivateKey),
+      pool: 'usdc',
+      rpcUrl: options.rpcUrl,
+      provingKeyPath: options.provingKeyPath,
+      onProgress: options.onProgress,
+    });
+    const relayResult = await submitRelay({
+      type: 'withdraw',
+      pool: 'usdc',
+      // x402 funding must target the low-minimum /x402 relay route. Default to it
+      // so direct SDK consumers do not silently hit the main relay's 5 USDC floor.
+      relayUrl: options.relayUrl ?? `${getRelayUrl()}/x402`,
+      proofArgs: proof.proofArgs,
+      extData: proof.extData,
+      metadata: {
         amount,
         amountAtomic,
-        relayTransactionHash: relayResult.transactionHash,
-        relayBlockNumber: relayResult.blockNumber,
-      });
-    } catch {
-      // Best-effort notification; never let a logging callback abort the payment.
+        recipient: payerAccount.address,
+        inputUtxoCount: proof.inputCount,
+        outputUtxoCount: proof.outputCount,
+        x402: true,
+        payerIndex: payerIndex.toString(),
+      },
+    });
+    relayTransactionHash = relayResult.transactionHash;
+    relayBlockNumber = relayResult.blockNumber;
+
+    // The payer is now funded. Notify the caller before signing so a funded-state
+    // record can be persisted even if a later step throws and strands funds.
+    if (options.onPayerFunded) {
+      try {
+        options.onPayerFunded({
+          payerAddress: payerAccount.address,
+          payerIndex: payerIndex.toString(),
+          amount,
+          amountAtomic,
+          relayTransactionHash,
+          relayBlockNumber,
+        });
+      } catch {
+        // Best-effort notification; never let a logging callback abort the payment.
+      }
     }
   }
 
@@ -307,10 +342,121 @@ export async function payX402Resource(options: PayX402ResourceOptions): Promise<
     payerIndex: payerIndex.toString(),
     amount,
     amountAtomic,
-    relayTransactionHash: relayResult.transactionHash,
-    relayBlockNumber: relayResult.blockNumber,
+    relayTransactionHash,
+    relayBlockNumber,
     paymentResponse,
     paymentTransactionHash: paymentResponse?.transaction,
+  };
+}
+
+export interface QuoteX402ResourceOptions {
+  url: string;
+  rpcUrl?: string;
+  /**
+   * Optional USDC spend cap (decimal string). When set, the result reports
+   * whether the merchant's price exceeds it so a caller can refuse before paying.
+   */
+  maxPayment?: string;
+  fetchImpl?: typeof fetch;
+  init?: RequestInit;
+}
+
+export interface QuoteX402ResourceResult {
+  /** True when the endpoint returned HTTP 402 (payment required). */
+  requiresPayment: boolean;
+  /** True when the 402 offers a Veil-supported exact Base USDC requirement. */
+  supported: boolean;
+  /** Initial HTTP status from the unpaid probe. */
+  status: number;
+  amount?: string;
+  amountAtomic?: string;
+  payTo?: string;
+  network?: string;
+  asset?: string;
+  /** Set when maxPayment was supplied: true if the price exceeds the cap. */
+  exceedsMax?: boolean;
+  maxPayment?: string;
+  /** Parsed response body for a non-402 probe, so the caller can see the error. */
+  body?: unknown;
+  /** Populated when a 402 was returned but no supported requirement could be parsed. */
+  error?: string;
+}
+
+/**
+ * Probe an x402 resource WITHOUT funding a payer or signing a payment. Returns
+ * the price/requirement for a supported 402, or the raw response for anything
+ * else, so a caller can validate the request and confirm cost before committing
+ * a withdrawal. Note: a merchant that only validates the request body after
+ * payment will still return 402 here; this cannot catch post-payment errors.
+ */
+export async function quoteX402Resource(options: QuoteX402ResourceOptions): Promise<QuoteX402ResourceResult> {
+  const fetchImpl = options.fetchImpl ?? globalThis.fetch;
+  if (!fetchImpl) {
+    throw new Error('fetch is not available; pass fetchImpl');
+  }
+
+  // A selector-only client is enough to parse the 402; no signer/scheme needed
+  // because we never sign or settle in a quote.
+  const client = new x402Client((_version, requirements) =>
+    selectBaseUsdcExactRequirement({
+      x402Version: 2,
+      resource: { url: options.url },
+      accepts: requirements,
+    }),
+  );
+  const httpClient = new x402HTTPClient(client);
+
+  const initialResponse = await fetchImpl(options.url, options.init);
+  if (initialResponse.status !== 402) {
+    let body: unknown;
+    try {
+      body = await initialResponse.clone().json();
+    } catch {
+      try {
+        body = await initialResponse.clone().text();
+      } catch {
+        body = undefined;
+      }
+    }
+    return {
+      requiresPayment: false,
+      supported: false,
+      status: initialResponse.status,
+      body,
+    };
+  }
+
+  let requirement: PaymentRequirements;
+  try {
+    const paymentRequired = await parsePaymentRequired(initialResponse, httpClient);
+    requirement = selectBaseUsdcExactRequirement(paymentRequired);
+  } catch (error) {
+    return {
+      requiresPayment: true,
+      supported: false,
+      status: 402,
+      error: error instanceof Error ? error.message : 'Unsupported x402 requirement',
+    };
+  }
+
+  const amountAtomic = normalizeAtomicAmount(requirement.amount);
+  const amount = usdcAtomicToDecimalString(amountAtomic);
+  let exceedsMax: boolean | undefined;
+  if (options.maxPayment !== undefined) {
+    exceedsMax = BigInt(amountAtomic) > usdcDecimalToAtomic(options.maxPayment);
+  }
+
+  return {
+    requiresPayment: true,
+    supported: true,
+    status: 402,
+    amount,
+    amountAtomic,
+    payTo: requirement.payTo,
+    network: requirement.network,
+    asset: requirement.asset,
+    exceedsMax,
+    maxPayment: options.maxPayment,
   };
 }
 
