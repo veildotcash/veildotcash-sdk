@@ -118,10 +118,9 @@ keypair.privkey; // '0x...'
 
 ### Transaction Builders
 
-> **Daily free deposits**: Each address gets a configurable number of fee-free
-> deposits per UTC day. The CLI handles this automatically. If you use the
-> builders programmatically, call `getDailyFreeRemaining()` first — when the
-> user has free slots, pass the net amount directly (no fee markup needed).
+The CLI treats deposit amounts as net amounts and adds the 0.3% protocol fee
+automatically. The low-level transaction builders use the amount you pass as the
+gross amount sent to the Entry contract.
 
 ```typescript
 import {
@@ -305,7 +304,7 @@ such as `circomlib`, `eth-sig-util`, and `fixed-merkle-tree`.
 Balance functions accept an optional `pool` parameter (`'eth'` | `'usdc'`), defaulting to `'eth'`.
 
 ```typescript
-import { getQueueBalance, getPrivateBalance, getDailyFreeRemaining } from '@veil-cash/sdk';
+import { getQueueBalance, getPrivateBalance } from '@veil-cash/sdk';
 
 // Check ETH queue balance (pending deposits)
 const queueBalance = await getQueueBalance({
@@ -319,12 +318,6 @@ const privateBalance = await getPrivateBalance({
   pool: 'usdc',
 });
 
-// Check how many fee-free deposits the user has left today
-const freeRemaining = await getDailyFreeRemaining({
-  address: '0x...',
-  pool: 'eth', // default
-});
-// freeRemaining: number — 0 when all free slots are used or the feature is disabled
 ```
 
 ### Subaccounts
