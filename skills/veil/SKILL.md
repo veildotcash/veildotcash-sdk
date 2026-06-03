@@ -330,9 +330,7 @@ Important:
   - If not yet registered, returns a normal `register` payload.
 
 Deposits treat the CLI amount as the **net** amount that lands in the pool.
-Each address gets a configurable number of fee-free deposits per UTC day.
-The CLI checks automatically — if free slots remain the fee is waived;
-otherwise the `0.3%` protocol fee is calculated on-chain and added.
+A `0.3%` protocol fee is calculated on-chain and added on top.
 After submission, deposits go through screening / queue processing before they
 are accepted into the private pool. This typically takes around `10-15 minutes`.
 

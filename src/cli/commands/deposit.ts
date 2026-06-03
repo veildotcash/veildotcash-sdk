@@ -4,7 +4,6 @@
 
 import { Command } from 'commander';
 import { buildDepositETHTx, buildDepositUSDCTx, buildApproveUSDCTx } from '../../deposit.js';
-import { getDailyFreeRemaining } from '../../balance.js';
 import { sendTransaction, getAddress, getBalance } from '../wallet.js';
 import { getConfig, resolveAddress } from '../config.js';
 import { createPublicClient, http, parseEther, parseUnits, formatEther, formatUnits } from 'viem';
@@ -23,21 +22,12 @@ const MINIMUM_NET: Record<string, number> = {
 
 /**
  * Compute the gross amount and fee for a deposit.
- * Checks daily free deposit availability first — if the user has
- * free slots remaining the fee is waived and gross === net.
+ * The 0.3% protocol fee is always added on top of the net amount.
  */
 async function getGrossAmount(
   netWei: bigint,
-  depositor: `0x${string}`,
-  pool: 'eth' | 'usdc',
   rpcUrl: string | undefined,
-): Promise<{ grossWei: bigint; feeWei: bigint; dailyFreeUsed: boolean; dailyFreeRemaining: number }> {
-  const freeRemaining = await getDailyFreeRemaining({ address: depositor, pool, rpcUrl });
-
-  if (freeRemaining > 0) {
-    return { grossWei: netWei, feeWei: 0n, dailyFreeUsed: true, dailyFreeRemaining: freeRemaining - 1 };
-  }
-
+): Promise<{ grossWei: bigint; feeWei: bigint }> {
   const publicClient = createPublicClient({
     chain: base,
     transport: http(rpcUrl),
@@ -50,7 +40,7 @@ async function getGrossAmount(
     args: [netWei],
   }) as bigint;
 
-  return { grossWei, feeWei: grossWei - netWei, dailyFreeUsed: false, dailyFreeRemaining: 0 };
+  return { grossWei, feeWei: grossWei - netWei };
 }
 
 const SUPPORTED_ASSETS = ['ETH', 'USDC'];
@@ -65,12 +55,11 @@ export function createDepositCommand(): Command {
     .option('--json', 'Output as JSON')
     .addHelpText('after', `
 The amount you specify is the net amount that lands in your Veil balance.
-A 0.3% protocol fee is normally added on top, but each address gets
-free daily deposits (fee waived). The CLI checks automatically.
+A 0.3% protocol fee is added on top.
 
 Examples:
-  veil deposit ETH 0.1          # deposits 0.1 ETH (free or ~0.1003 ETH)
-  veil deposit USDC 100         # deposits 100 USDC (free or ~100.30 USDC)
+  veil deposit ETH 0.1          # deposits 0.1 ETH (~0.1003 ETH sent)
+  veil deposit USDC 100         # deposits 100 USDC (~100.30 USDC sent)
   veil deposit ETH 0.1 --unsigned --address 0x...
   SIGNER_ADDRESS=0x... veil deposit ETH 0.1 --unsigned
   veil deposit ETH 0.1 --json
@@ -123,12 +112,7 @@ Examples:
 
         progress('Checking deposit fee...');
 
-        const { grossWei, feeWei, dailyFreeUsed, dailyFreeRemaining } = await getGrossAmount(
-          netWei,
-          address,
-          pool,
-          feeRpcUrl,
-        );
+        const { grossWei, feeWei } = await getGrossAmount(netWei, feeRpcUrl);
         const grossStr = assetUpper === 'ETH'
           ? formatEther(grossWei)
           : formatUnits(grossWei, poolConfig.decimals);
@@ -244,7 +228,6 @@ Examples:
           asset: assetUpper,
           amount,
           fee: feeStr,
-          dailyFreeUsed,
           totalSent: grossStr,
           blockNumber: result.receipt.blockNumber.toString(),
         };
@@ -254,9 +237,7 @@ Examples:
           return;
         }
 
-        const feeLabel = dailyFreeUsed
-          ? `0 ${assetUpper} (free — ${dailyFreeRemaining} remaining today)`
-          : `${feeStr} ${assetUpper} (0.3%)`;
+        const feeLabel = `${feeStr} ${assetUpper} (0.3%)`;
 
         printHeader('Deposit Submitted');
         printFields([

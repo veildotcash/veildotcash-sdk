@@ -147,11 +147,11 @@ SIGNER_ADDRESS=0x... veil register --unsigned
 
 In `--unsigned` mode, `--address` is optional when `SIGNER_ADDRESS` is set. `veil register --force` checks on-chain state first and emits a `changeDepositKey` payload only if the address is already registered; otherwise it emits a normal `register` payload.
 
-Deposit ETH or USDC into Veil. The amount you specify is the **net** amount that arrives in your Veil balance. A 0.3% protocol fee is normally added on top, but each address gets free daily deposits (fee waived). The CLI checks automatically:
+Deposit ETH or USDC into Veil. The amount you specify is the **net** amount that arrives in your Veil balance. A 0.3% protocol fee is added on top:
 
 ```bash
-veil deposit ETH 0.1            # 0.1 ETH lands in pool (free or ~0.1003 ETH sent)
-veil deposit USDC 100           # 100 USDC lands in pool (free or ~100.30 USDC sent)
+veil deposit ETH 0.1            # 0.1 ETH lands in pool (~0.1003 ETH sent)
+veil deposit USDC 100           # 100 USDC lands in pool (~100.30 USDC sent)
 veil deposit ETH 0.1 --json
 veil deposit ETH 0.1 --unsigned --address 0x...
 SIGNER_ADDRESS=0x... veil deposit ETH 0.1 --unsigned
@@ -339,7 +339,7 @@ The CLI is the main entrypoint for most users. If you are integrating Veil progr
 2. **Derive Keypair**: Run `veil init` to derive and save your Veil keypair
 3. **Register**: Run `veil register` to link your deposit key on-chain (one-time)
 4. **Check Status**: Run `veil status` to verify your setup
-5. **Deposit**: Run `veil deposit <asset> <amount>` — the amount is what lands in your balance (e.g., `veil deposit ETH 0.1` deposits 0.1 ETH; the fee is waived if you have daily free deposits remaining, otherwise 0.3% is added automatically)
+5. **Deposit**: Run `veil deposit <asset> <amount>` — the amount is what lands in your balance (e.g., `veil deposit ETH 0.1` deposits 0.1 ETH; a 0.3% protocol fee is added on top automatically)
 6. **Wait**: The Veil deposit engine processes your deposit
 7. **Done**: Your deposit is accepted into the privacy pool
 
