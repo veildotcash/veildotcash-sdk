@@ -24,6 +24,11 @@ const X402_PAYER_DOMAIN = 'veil-x402-payer';
 const BASE_NETWORK = `eip155:${ADDRESSES.chainId}` as const;
 const USDC_DECIMALS = POOL_CONFIG.usdc.decimals;
 
+// The /x402 relay route enforces a minimum withdrawal (default 0.001 USDC =
+// 1000 atomic). A top-up shortfall below this floor is bumped up to it; the payer
+// then ends slightly above the price, leaving a sub-min residue drained next reuse.
+const X402_MIN_WITHDRAW_ATOMIC = 1000n;
+
 export interface PayX402ResourceOptions {
   url: string;
   rootPrivateKey: `0x${string}`;
@@ -49,12 +54,16 @@ export interface PayX402ResourceOptions {
    */
   onPayerFunded?: (info: X402PayerFundedInfo) => void;
   /**
-   * When true, if the derived payer EOA already holds >= the required amount,
-   * skip the relay-funded withdrawal and pay directly from that balance. Use to
-   * retry a payment whose funding succeeded but whose delivery failed, without
-   * burning a second withdrawal. Throws if the payer's balance is insufficient.
+   * Controls funding when the derived payer EOA already holds USDC:
+   * - `true`: if the payer holds >= the required amount, skip the relay-funded
+   *   withdrawal and pay from that balance; throws if the balance is insufficient.
+   * - `'topup'`: reuse the payer, withdrawing only the shortfall (amount - balance)
+   *   when it holds less than the price. Drains stranded dust toward zero without a
+   *   fresh full withdrawal; if the payer already holds enough, funding is skipped.
+   * - `false`/undefined: always withdraw the full amount to the payer.
+   * Use reuse to retry a payment whose funding succeeded but whose delivery failed.
    */
-  reuseExistingBalance?: boolean;
+  reuseExistingBalance?: boolean | 'topup';
 }
 
 export interface X402PayerFundedInfo {
@@ -243,7 +252,10 @@ export async function payX402Resource(options: PayX402ResourceOptions): Promise<
   // failed (the USDC is still sitting on the payer EOA) without a second withdrawal.
   let relayTransactionHash = '';
   let relayBlockNumber = '';
-  let skipFunding = false;
+  // How much USDC to actually withdraw to the payer. For a fresh payer this is the
+  // full amount; when reusing, it is only the shortfall ('topup') or zero (the payer
+  // already holds enough).
+  let fundAtomic = BigInt(amountAtomic);
   if (options.reuseExistingBalance) {
     const payerBalance = (await publicClient.readContract({
       address: ADDRESSES.usdcToken,
@@ -252,20 +264,31 @@ export async function payX402Resource(options: PayX402ResourceOptions): Promise<
       args: [payerAccount.address],
     })) as bigint;
     if (payerBalance >= BigInt(amountAtomic)) {
-      skipFunding = true;
+      fundAtomic = 0n;
+    } else if (options.reuseExistingBalance === 'topup') {
+      // Drain dust: withdraw only the shortfall so the payer lands at ~exactly the
+      // price after this payment, driving a stranded balance toward zero without a
+      // fresh full withdrawal.
+      fundAtomic = BigInt(amountAtomic) - payerBalance;
     } else {
       throw new Error(
-        `Cannot reuse payer index ${payerIndex.toString()}: holds ${formatUnits(payerBalance, USDC_DECIMALS)} USDC but the resource requires ${amount} USDC.`,
+        `Cannot reuse payer index ${payerIndex.toString()}: holds ${formatUnits(payerBalance, USDC_DECIMALS)} USDC but the resource requires ${amount} USDC. Pass reuseExistingBalance: 'topup' to fund the shortfall.`,
       );
     }
   }
 
-  if (skipFunding) {
+  if (fundAtomic === 0n) {
     options.onProgress?.('Reusing funded x402 payer...', `${amount} USDC on ${payerAccount.address}`);
   } else {
-    options.onProgress?.('Funding x402 payer...', `${amount} USDC to ${payerAccount.address}`);
+    // Bump a sub-minimum shortfall up to the relay floor so the /x402 route accepts
+    // it; the payer ends slightly above the price (residue drained on next reuse).
+    if (fundAtomic < X402_MIN_WITHDRAW_ATOMIC) {
+      fundAtomic = X402_MIN_WITHDRAW_ATOMIC;
+    }
+    const fundAmount = usdcAtomicToDecimalString(fundAtomic);
+    options.onProgress?.('Funding x402 payer...', `${fundAmount} USDC to ${payerAccount.address}`);
     const proof = await buildWithdrawProof({
-      amount,
+      amount: fundAmount,
       recipient: payerAccount.address,
       keypair: new Keypair(options.rootPrivateKey),
       pool: 'usdc',
@@ -282,8 +305,8 @@ export async function payX402Resource(options: PayX402ResourceOptions): Promise<
       proofArgs: proof.proofArgs,
       extData: proof.extData,
       metadata: {
-        amount,
-        amountAtomic,
+        amount: fundAmount,
+        amountAtomic: fundAtomic.toString(),
         recipient: payerAccount.address,
         inputUtxoCount: proof.inputCount,
         outputUtxoCount: proof.outputCount,
