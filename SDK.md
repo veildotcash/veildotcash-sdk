@@ -11,6 +11,7 @@ import {
   Keypair, buildRegisterTx, buildDepositETHTx,
   buildDepositUSDCTx, buildApproveUSDCTx,
   withdraw, transfer, getSubaccountStatus, mergeSubaccount,
+  payX402Resource,
 } from '@veil-cash/sdk';
 import { createWalletClient, http } from 'viem';
 import { base } from 'viem/chains';
@@ -72,6 +73,14 @@ const subaccount = await getSubaccountStatus({
 });
 console.log(subaccount.slot.forwarderAddress);
 
+// 8. Pay an x402 resource from private USDC
+const paid = await payX402Resource({
+  url: 'https://merchant.example/paid-resource',
+  rootPrivateKey: keypair.privkey as `0x${string}`,
+  payerIndex: 0n,
+  relayUrl: process.env.X402_RELAY_URL,
+});
+console.log(paid.response.status, paid.payerAddress);
 ```
 
 ## SDK API Reference
@@ -109,10 +118,9 @@ keypair.privkey; // '0x...'
 
 ### Transaction Builders
 
-> **Daily free deposits**: Each address gets a configurable number of fee-free
-> deposits per UTC day. The CLI handles this automatically. If you use the
-> builders programmatically, call `getDailyFreeRemaining()` first — when the
-> user has free slots, pass the net amount directly (no fee markup needed).
+The CLI treats deposit amounts as net amounts and adds the 0.3% protocol fee
+automatically. The low-level transaction builders use the amount you pass as the
+gross amount sent to the Entry contract.
 
 ```typescript
 import {
@@ -182,6 +190,70 @@ const mergeResult = await mergeUtxos({
 });
 ```
 
+### x402 Payments
+
+`payX402Resource()` pays standard x402 v2 Base USDC `exact` resources from a
+private Veil USDC balance while remaining compatible with Coinbase-facilitated
+merchants.
+
+```typescript
+import {
+  deriveX402PayerAddress,
+  payX402Resource,
+  usdcAtomicToDecimalString,
+} from '@veil-cash/sdk';
+
+const payerAddress = deriveX402PayerAddress(
+  process.env.VEIL_KEY as `0x${string}`,
+  42n,
+);
+
+const amount = usdcAtomicToDecimalString('1000'); // "0.001"
+
+const result = await payX402Resource({
+  url: 'https://merchant.example/paid-resource',
+  rootPrivateKey: process.env.VEIL_KEY as `0x${string}`,
+  payerIndex: 42n,
+  maxPayment: '0.10', // cap exposure; reject if the resource demands more
+  relayUrl: process.env.X402_RELAY_URL,
+  rpcUrl: process.env.RPC_URL,
+  onProgress: (stage, detail) => console.log(stage, detail),
+});
+
+console.log({
+  status: result.response.status,
+  payerAddress: result.payerAddress,
+  relayTx: result.relayTransactionHash,
+  paymentTx: result.paymentTransactionHash,
+});
+```
+
+The payer key uses the `veil-x402-payer` derivation domain, separate from
+subaccounts. Use a fresh, persisted `payerIndex` for each payment. Set
+`maxPayment` (a decimal USDC string) to cap exposure; the payment is rejected
+before any funds move if the requirement exceeds the cap. The helper currently
+supports x402 v2 `exact` requirements on Base mainnet USDC only; it rejects other
+assets, networks, and schemes.
+
+`quoteX402Resource({ url, rpcUrl, maxPayment, init })` probes a resource without
+funding a payer or signing a payment. For a supported `402` it returns the price
+and requirement (`amount`, `amountAtomic`, `payTo`, `network`, `asset`, and
+`exceedsMax` when `maxPayment` is set); for any other status it returns the raw
+`status` and parsed `body`. Use it to validate a request and confirm cost before
+committing a withdrawal. A merchant that validates the request body only after
+payment will still return `402` here, so a quote cannot catch post-payment errors.
+
+To retry a payment whose funding succeeded but whose delivery failed (the USDC is
+still on the payer EOA), pass `reuseExistingBalance: true` with the same
+`payerIndex`. When the payer already holds at least the required amount,
+`payX402Resource` skips the withdrawal and pays directly from that balance
+(`relayTransactionHash` is empty); it throws if the balance is insufficient.
+
+`getX402PayerBalances({ rootPrivateKey, startIndex, count, nonZeroOnly })`
+inspects the Base USDC balance held by each derived payer EOA, which is useful
+for surfacing funds left on a payer after a failed payment. It is read-only and
+does not move funds.
+
 ### Browser Proof Generation
 
 `withdraw()`, `transfer()`, `mergeUtxos()`, `mergeSubaccount()`, `buildWithdrawProof()`,
@@ -232,7 +304,7 @@ such as `circomlib`, `eth-sig-util`, and `fixed-merkle-tree`.
 Balance functions accept an optional `pool` parameter (`'eth'` | `'usdc'`), defaulting to `'eth'`.
 
 ```typescript
-import { getQueueBalance, getPrivateBalance, getDailyFreeRemaining } from '@veil-cash/sdk';
+import { getQueueBalance, getPrivateBalance } from '@veil-cash/sdk';
 
 // Check ETH queue balance (pending deposits)
 const queueBalance = await getQueueBalance({
@@ -246,12 +318,6 @@ const privateBalance = await getPrivateBalance({
   pool: 'usdc',
 });
 
-// Check how many fee-free deposits the user has left today
-const freeRemaining = await getDailyFreeRemaining({
-  address: '0x...',
-  pool: 'eth', // default
-});
-// freeRemaining: number — 0 when all free slots are used or the feature is disabled
 ```
 
 ### Subaccounts

@@ -53,7 +53,6 @@ export {
 export {
   getQueueBalance,
   getPrivateBalance,
-  getDailyFreeRemaining,
 } from './balance.js';
 export type { ProgressCallback } from './balance.js';
 
@@ -63,6 +62,27 @@ export {
   buildWithdrawProof,
   selectUtxosForWithdraw,
 } from './withdraw.js';
+
+// x402 payment helpers
+export {
+  deriveX402PayerKey,
+  deriveX402PayerAddress,
+  getX402PayerBalances,
+  payX402Resource,
+  quoteX402Resource,
+  selectBaseUsdcExactRequirement,
+  usdcAtomicToDecimalString,
+  usdcDecimalToAtomic,
+} from './x402.js';
+export type {
+  GetX402PayerBalancesOptions,
+  PayX402ResourceOptions,
+  PayX402ResourceResult,
+  QuoteX402ResourceOptions,
+  QuoteX402ResourceResult,
+  X402PayerBalance,
+  X402PayerFundedInfo,
+} from './x402.js';
 
 // Transfer functions
 export {

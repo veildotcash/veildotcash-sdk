@@ -8,6 +8,8 @@ SDK and CLI for interacting with [Veil Cash](https://veil.cash) privacy pools on
 
 Generate keypairs, register, deposit, withdraw, transfer, and merge ETH and USDC privately.
 
+`0.7.0` adds Coinbase-compatible x402 payments from private USDC balances via deterministic fresh payer EOAs.
+
 `0.6.2` adds `mergeSubaccount` — transfer a subaccount's private pool balance back to the main wallet via a ZK proof. Also adds `veil subaccount merge` CLI command.
 
 `0.6.0` adds SDK-first subaccount support for deterministic slot derivation, forwarder status, relay-backed deploy/sweep, and direct recovery.
@@ -91,7 +93,10 @@ veil subaccount sweep --slot 0 --asset eth
 veil subaccount merge --slot 0 --pool eth
 veil subaccount recover --slot 0 --asset usdc --to 0xRecipientAddress --amount 25
 
-# 9. Use JSON or unsigned modes when you need automation
+# 9. Pay an x402 resource from private USDC in application code
+# See SDK.md for payX402Resource().
+
+# 10. Use JSON or unsigned modes when you need automation
 veil status --json
 veil deposit ETH 0.1 --unsigned --address 0x...
 veil subaccount status --slot 0 --json
@@ -142,11 +147,11 @@ SIGNER_ADDRESS=0x... veil register --unsigned
 
 In `--unsigned` mode, `--address` is optional when `SIGNER_ADDRESS` is set. `veil register --force` checks on-chain state first and emits a `changeDepositKey` payload only if the address is already registered; otherwise it emits a normal `register` payload.
 
-Deposit ETH or USDC into Veil. The amount you specify is the **net** amount that arrives in your Veil balance. A 0.3% protocol fee is normally added on top, but each address gets free daily deposits (fee waived). The CLI checks automatically:
+Deposit ETH or USDC into Veil. The amount you specify is the **net** amount that arrives in your Veil balance. A 0.3% protocol fee is added on top:
 
 ```bash
-veil deposit ETH 0.1            # 0.1 ETH lands in pool (free or ~0.1003 ETH sent)
-veil deposit USDC 100           # 100 USDC lands in pool (free or ~100.30 USDC sent)
+veil deposit ETH 0.1            # 0.1 ETH lands in pool (~0.1003 ETH sent)
+veil deposit USDC 100           # 100 USDC lands in pool (~100.30 USDC sent)
 veil deposit ETH 0.1 --json
 veil deposit ETH 0.1 --unsigned --address 0x...
 SIGNER_ADDRESS=0x... veil deposit ETH 0.1 --unsigned
@@ -204,6 +209,43 @@ veil merge ETH 0.1
 veil merge USDC 100
 veil merge ETH 0.1 --json
 ```
+
+Pay a Coinbase-compatible x402 resource from private USDC:
+
+```typescript
+import { payX402Resource } from '@veil-cash/sdk';
+
+const result = await payX402Resource({
+  url: 'https://merchant.example/paid-resource',
+  rootPrivateKey: process.env.VEIL_KEY as `0x${string}`,
+  payerIndex: 0n,
+  maxPayment: '0.10', // reject if the resource demands more than 0.10 USDC
+  relayUrl: process.env.X402_RELAY_URL,
+  rpcUrl: process.env.RPC_URL,
+});
+
+console.log(result.response.status, result.payerAddress);
+```
+
+The helper withdraws the exact x402 amount to a deterministic fresh payer EOA,
+then signs a standard x402 v2 Base USDC `exact` payment from that EOA. Use a
+new `payerIndex` per payment. Pass `maxPayment` (a decimal USDC string) to cap
+exposure; the payment is rejected before any funds move if the requirement
+exceeds the cap. The withdrawal and payment legs are public and can be correlated
+by amount and timing, but the source private balance remains hidden.
+
+Use `quoteX402Resource({ url, rpcUrl, maxPayment, init })` to probe a resource
+for its price and payment requirement without funding a payer or paying. It
+returns the parsed requirement for a supported `402` or the raw status/body
+otherwise.
+
+If a payment is funded but delivery fails, the USDC stays on the payer EOA. Retry
+with `reuseExistingBalance: true` and the same `payerIndex` to pay from that
+balance without a second withdrawal; it throws if the balance is insufficient.
+
+To surface funds left on a payer after a failed payment, use
+`getX402PayerBalances({ rootPrivateKey, startIndex, count, nonZeroOnly })`, which
+returns the Base USDC balance of each derived payer EOA. It is read-only.
 
 ### Subaccounts
 
@@ -297,7 +339,7 @@ The CLI is the main entrypoint for most users. If you are integrating Veil progr
 2. **Derive Keypair**: Run `veil init` to derive and save your Veil keypair
 3. **Register**: Run `veil register` to link your deposit key on-chain (one-time)
 4. **Check Status**: Run `veil status` to verify your setup
-5. **Deposit**: Run `veil deposit <asset> <amount>` — the amount is what lands in your balance (e.g., `veil deposit ETH 0.1` deposits 0.1 ETH; the fee is waived if you have daily free deposits remaining, otherwise 0.3% is added automatically)
+5. **Deposit**: Run `veil deposit <asset> <amount>` — the amount is what lands in your balance (e.g., `veil deposit ETH 0.1` deposits 0.1 ETH; a 0.3% protocol fee is added on top automatically)
 6. **Wait**: The Veil deposit engine processes your deposit
 7. **Done**: Your deposit is accepted into the privacy pool
 

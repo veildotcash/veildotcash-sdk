@@ -155,9 +155,12 @@ export interface RelayExtData {
  */
 export interface RelayMetadata {
   amount?: string;
+  amountAtomic?: string;
   recipient?: string;
   inputUtxoCount?: number;
   outputUtxoCount?: number;
+  x402?: boolean;
+  payerIndex?: string;
 }
 
 /**
@@ -228,6 +231,8 @@ export interface BuildWithdrawProofOptions {
   pool?: RelayPool;
   /** Optional RPC URL */
   rpcUrl?: string;
+  /** Optional relay URL */
+  relayUrl?: string;
   /**
    * Optional proving key directory/base URL or resolver.
    *
