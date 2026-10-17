@@ -350,37 +350,6 @@ export interface SubaccountSlot {
 }
 
 /**
- * Relay-backed forwarder deploy request
- */
-export interface SubaccountDeployRequest {
-  rootPrivateKey: `0x${string}`;
-  slot: number;
-  relayUrl?: string;
-  rpcUrl?: string;
-}
-
-/**
- * Relay-backed forwarder sweep request
- */
-export interface SubaccountSweepRequest {
-  forwarderAddress: `0x${string}`;
-  asset: SubaccountAsset;
-  relayUrl?: string;
-}
-
-/**
- * Relay response for subaccount deploy/sweep operations
- */
-export interface SubaccountRelayResult {
-  success: boolean;
-  transactionHash: string;
-  blockNumber: string;
-  gasUsed: string;
-  status: string;
-  network: string;
-}
-
-/**
  * Human-readable and wei-denominated balance
  */
 export interface SubaccountAssetBalance {
@@ -430,6 +399,10 @@ export interface SubaccountQueueStatus {
  * Combined subaccount status result
  */
 export interface SubaccountStatusResult {
+  /** Always true: subaccounts are retired and status exists for recovery only */
+  retired: true;
+  /** Do-not-fund and recovery guidance to show alongside the forwarder address */
+  notice: string;
   slot: SubaccountSlot;
   deployed: boolean;
   balances: SubaccountBalances;

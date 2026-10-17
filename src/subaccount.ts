@@ -16,23 +16,20 @@ import { FORWARDER_ABI, FORWARDER_FACTORY_ABI, ERC20_ABI, POOL_ABI } from './abi
 import { FORWARDER_CONTRACT_VERSION, getAddresses, getForwarderFactoryAddress, getPoolAddress, POOL_CONFIG } from './addresses.js';
 import { getPrivateBalance, getQueueBalance } from './balance.js';
 import { Keypair } from './keypair.js';
-import { postRelayJson, submitRelay } from './relay.js';
+import { submitRelay } from './relay.js';
 import { prepareTransaction } from './transaction.js';
 import { Utxo } from './utxo.js';
 import { selectUtxosForWithdraw } from './withdraw.js';
 import type {
   SubaccountAsset,
-  SubaccountDeployRequest,
   SubaccountMergeOptions,
   SubaccountMergeResult,
   PrivateBalanceResult,
   SubaccountPrivateBalanceStatus,
   SubaccountQueueStatus,
   SubaccountRecoveryResult,
-  SubaccountRelayResult,
   SubaccountSlot,
   SubaccountStatusResult,
-  SubaccountSweepRequest,
   SubaccountWithdrawTypedData,
 } from './types.js';
 
@@ -42,6 +39,15 @@ const ETH_ADDRESS = '0x0000000000000000000000000000000000000000' as const;
 const DEFAULT_WITHDRAW_DEADLINE_SECONDS = 3600n;
 const DEFAULT_MAX_NONCE_SCAN = 100n;
 export const MAX_SUBACCOUNT_SLOTS = 3;
+
+/**
+ * Subaccounts are retired. Forwarder addresses are reported only so existing
+ * funds can be recovered; new deposits to them cannot be deployed or swept.
+ */
+export const SUBACCOUNT_RETIRED_NOTICE =
+  'Subaccounts are retired. Do not send funds to this forwarder address. ' +
+  'Existing forwarder funds can be recovered with `veil subaccount recover`; ' +
+  'if the forwarder is not deployed, contact Veil support to have it deployed first.';
 
 function createBaseClient(rpcUrl?: string) {
   return createPublicClient({
@@ -191,47 +197,6 @@ export async function isSubaccountForwarderDeployed(options: {
   return !!code && code !== '0x';
 }
 
-export async function deploySubaccountForwarder(
-  options: SubaccountDeployRequest,
-): Promise<SubaccountRelayResult & { slot: SubaccountSlot }> {
-  const slot = await deriveSubaccountSlot({
-    rootPrivateKey: options.rootPrivateKey,
-    slot: options.slot,
-    rpcUrl: options.rpcUrl,
-  });
-
-  const result = await postRelayJson<SubaccountRelayResult>(
-    '/stealth/deploy',
-    {
-      salt: slot.salt,
-      childDepositKey: slot.childDepositKey,
-      childOwner: slot.childOwner,
-      expectedForwarder: slot.forwarderAddress,
-    },
-    options.relayUrl,
-  );
-
-  return { ...result, slot };
-}
-
-export async function sweepSubaccountForwarder(
-  options: SubaccountSweepRequest,
-): Promise<SubaccountRelayResult> {
-  const asset = normalizeAsset(options.asset);
-  if (!isAddress(options.forwarderAddress)) {
-    throw new Error('forwarderAddress must be a valid Ethereum address');
-  }
-
-  return postRelayJson<SubaccountRelayResult>(
-    '/stealth/sweep',
-    {
-      forwarder: options.forwarderAddress,
-      asset,
-    },
-    options.relayUrl,
-  );
-}
-
 function toQueueStatus(
   asset: SubaccountAsset,
   result: Awaited<ReturnType<typeof getQueueBalance>>,
@@ -322,6 +287,8 @@ export async function getSubaccountStatus(options: {
   ]);
 
   return {
+    retired: true,
+    notice: SUBACCOUNT_RETIRED_NOTICE,
     slot,
     deployed,
     balances: {
@@ -483,7 +450,9 @@ export async function buildSubaccountRecoveryTx(options: {
     rpcUrl: options.rpcUrl,
   });
   if (!deployed) {
-    throw new Error('Subaccount forwarder is not deployed');
+    throw new Error(
+      'Subaccount forwarder is not deployed. Subaccounts are retired; contact Veil support to have it deployed, then retry recovery.',
+    );
   }
   const childPrivateKey = deriveSubaccountChildPrivateKey(options.rootPrivateKey, options.slot);
   const tokenAddress =

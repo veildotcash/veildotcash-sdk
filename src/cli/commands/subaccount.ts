@@ -2,13 +2,9 @@ import { Command } from 'commander';
 import { isAddress } from 'viem';
 import {
   buildSubaccountRecoveryTx,
-  deploySubaccountForwarder,
-  deriveSubaccountSlot,
   getSubaccountStatus,
-  isSubaccountForwarderDeployed,
   MAX_SUBACCOUNT_SLOTS,
   mergeSubaccount,
-  sweepSubaccountForwarder,
 } from '../../subaccount.js';
 import { getConfig } from '../config.js';
 import { CLIError, ErrorCode, handleCLIError } from '../errors.js';
@@ -83,64 +79,20 @@ function printQueueHuman(
 
 export function createSubaccountCommand(): Command {
   const subaccount = new Command('subaccount')
-    .description('Manage Veil subaccounts')
+    .description('Recover funds from retired Veil subaccounts')
     .addHelpText('after', `
+Subaccounts are retired. Do not send funds to subaccount forwarder addresses.
+These commands exist only to recover funds that are already there.
+
 Examples:
-  veil subaccount derive --slot 0
   veil subaccount status --slot 0
-  veil subaccount deploy --slot 0
-  veil subaccount sweep --slot 0 --asset eth
   veil subaccount merge --slot 0 --pool eth
   veil subaccount recover --slot 0 --asset usdc --to 0xRecipientAddress --amount 25
-  veil subaccount address --slot 0
 `);
 
   subaccount
-    .command('derive')
-    .description('Derive subaccount metadata for a slot')
-    .requiredOption('--slot <n>', 'Subaccount slot', parseSlotValue)
-    .option('--json', 'Output as JSON')
-    .action(async (options) => {
-      try {
-        const rootPrivateKey = getRequiredVeilKey();
-        const rpcUrl = process.env.RPC_URL;
-        const slot = await deriveSubaccountSlot({
-          rootPrivateKey,
-          slot: options.slot,
-          rpcUrl,
-        });
-        const deployed = await isSubaccountForwarderDeployed({
-          forwarderAddress: slot.forwarderAddress,
-          rpcUrl,
-        });
-
-        const output = {
-          ...slot,
-          deployed,
-        };
-
-        if (options.json) {
-          printJson(output);
-          return;
-        }
-
-        printHeader(`Subaccount Slot ${slot.slot}`);
-        printFields([
-          { label: 'Child owner', value: slot.childOwner },
-          { label: 'Deposit key', value: slot.childDepositKey },
-          { label: 'Salt', value: slot.salt },
-          { label: 'Forwarder', value: slot.forwarderAddress },
-          { label: 'Deployed', value: deployed },
-        ]);
-        printLine();
-      } catch (error) {
-        handleCLIError(error);
-      }
-    });
-
-  subaccount
     .command('status')
-    .description('Show subaccount deployment, forwarder balances, private balances, and queue state')
+    .description('Show retired subaccount state for recovery (forwarder balances, private balances, queues)')
     .requiredOption('--slot <n>', 'Subaccount slot', parseSlotValue)
     .option('--json', 'Output as JSON')
     .action(async (options) => {
@@ -157,9 +109,11 @@ Examples:
           return;
         }
 
-        printHeader(`Subaccount Slot ${status.slot.slot}`);
+        printHeader(`Subaccount Slot ${status.slot.slot} (retired)`);
+        printLine(status.notice);
+        printLine();
         printFields([
-          { label: 'Forwarder', value: status.slot.forwarderAddress },
+          { label: 'Forwarder (do not fund)', value: status.slot.forwarderAddress },
           { label: 'Child owner', value: status.slot.childOwner },
           { label: 'Deposit key', value: status.slot.childDepositKey },
           { label: 'Salt', value: status.slot.salt },
@@ -186,91 +140,17 @@ Examples:
 
         printQueueHuman('ETH Queue', status.queues.eth);
         printQueueHuman('USDC Queue', status.queues.usdc);
-        printLine();
-      } catch (error) {
-        handleCLIError(error);
-      }
-    });
 
-  subaccount
-    .command('deploy')
-    .description('Deploy a subaccount forwarder through the relay')
-    .requiredOption('--slot <n>', 'Subaccount slot', parseSlotValue)
-    .option('--json', 'Output as JSON')
-    .action(async (options) => {
-      try {
-        const rootPrivateKey = getRequiredVeilKey();
-        const result = await deploySubaccountForwarder({
-          rootPrivateKey,
-          slot: options.slot,
-          rpcUrl: process.env.RPC_URL,
-          relayUrl: process.env.RELAY_URL,
-        });
-
-        const output = {
-          ...result,
-          slot: options.slot,
-          forwarderAddress: result.slot.forwarderAddress,
-        };
-
-        if (options.json) {
-          printJson(output);
-          return;
+        const hasForwarderFunds =
+          status.balances.eth.balanceWei !== '0' || status.balances.usdc.balanceWei !== '0';
+        if (hasForwarderFunds) {
+          printSection('Recovery');
+          printLine(
+            status.deployed
+              ? 'Forwarder holds funds. Run `veil subaccount recover --slot <n> --asset <eth|usdc> --to <address> --amount <value>`.'
+              : 'Forwarder holds funds but is not deployed. Contact Veil support to have it deployed, then run `veil subaccount recover`.',
+          );
         }
-
-        printHeader('Subaccount Deploy Submitted');
-        printFields([
-          { label: 'Slot', value: options.slot },
-          { label: 'Forwarder', value: result.slot.forwarderAddress },
-          { label: 'Transaction', value: txUrl(result.transactionHash) },
-          { label: 'Block', value: result.blockNumber },
-        ]);
-        printLine();
-      } catch (error) {
-        handleCLIError(error);
-      }
-    });
-
-  subaccount
-    .command('sweep')
-    .description('Sweep ETH or USDC from a subaccount forwarder through the relay')
-    .requiredOption('--slot <n>', 'Subaccount slot', parseSlotValue)
-    .requiredOption('--asset <asset>', 'Asset to sweep (eth or usdc)', parseAsset)
-    .option('--json', 'Output as JSON')
-    .action(async (options) => {
-      try {
-        const rootPrivateKey = getRequiredVeilKey();
-        const slot = await deriveSubaccountSlot({
-          rootPrivateKey,
-          slot: options.slot,
-          rpcUrl: process.env.RPC_URL,
-        });
-        const result = await sweepSubaccountForwarder({
-          forwarderAddress: slot.forwarderAddress,
-          asset: options.asset,
-          relayUrl: process.env.RELAY_URL,
-        });
-
-        const output = {
-          ...result,
-          slot: options.slot,
-          asset: options.asset,
-          forwarderAddress: slot.forwarderAddress,
-        };
-
-        if (options.json) {
-          printJson(output);
-          return;
-        }
-
-        printHeader('Subaccount Sweep Submitted');
-        printFields([
-          { label: 'Slot', value: options.slot },
-          { label: 'Asset', value: options.asset.toUpperCase() },
-          { label: 'Forwarder', value: slot.forwarderAddress },
-          { label: 'Transaction', value: txUrl(result.transactionHash) },
-          { label: 'Block', value: result.blockNumber },
-        ]);
         printLine();
       } catch (error) {
         handleCLIError(error);
@@ -337,7 +217,7 @@ Examples:
 
   subaccount
     .command('recover')
-    .description('Recover assets sitting on the subaccount forwarder with a direct withdraw transaction')
+    .description('Recover assets sitting on a deployed subaccount forwarder with an owner-signed withdraw transaction')
     .requiredOption('--slot <n>', 'Subaccount slot', parseSlotValue)
     .requiredOption('--asset <asset>', 'Asset to recover (eth or usdc)', parseAsset)
     .requiredOption('--to <address>', 'Recipient address')
@@ -398,34 +278,6 @@ Examples:
           { label: 'Block', value: result.receipt.blockNumber },
         ]);
         printLine();
-      } catch (error) {
-        handleCLIError(error);
-      }
-    });
-
-  subaccount
-    .command('address')
-    .description('Print the predicted forwarder address for a subaccount slot')
-    .requiredOption('--slot <n>', 'Subaccount slot', parseSlotValue)
-    .option('--json', 'Output as JSON')
-    .action(async (options) => {
-      try {
-        const rootPrivateKey = getRequiredVeilKey();
-        const slot = await deriveSubaccountSlot({
-          rootPrivateKey,
-          slot: options.slot,
-          rpcUrl: process.env.RPC_URL,
-        });
-
-        if (options.json) {
-          printJson({
-            slot: options.slot,
-            forwarderAddress: slot.forwarderAddress,
-          });
-          return;
-        }
-
-        printLine(slot.forwarderAddress);
       } catch (error) {
         handleCLIError(error);
       }
