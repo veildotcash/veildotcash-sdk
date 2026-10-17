@@ -151,6 +151,7 @@ export {
 // Subaccount functions
 export {
   MAX_SUBACCOUNT_SLOTS,
+  SUBACCOUNT_RETIRED_NOTICE,
   deriveSubaccountChildPrivateKey,
   deriveSubaccountSalt,
   deriveSubaccountChildOwner,
@@ -158,8 +159,6 @@ export {
   deriveSubaccountSlot,
   predictSubaccountForwarder,
   isSubaccountForwarderDeployed,
-  deploySubaccountForwarder,
-  sweepSubaccountForwarder,
   getSubaccountPrivateBalance,
   getSubaccountStatus,
   buildSubaccountWithdrawTypedData,
@@ -215,9 +214,6 @@ export type {
   UtxoSelectionResult,
   SubaccountAsset,
   SubaccountSlot,
-  SubaccountDeployRequest,
-  SubaccountSweepRequest,
-  SubaccountRelayResult,
   SubaccountAssetBalance,
   SubaccountBalances,
   SubaccountPrivateBalanceStatus,

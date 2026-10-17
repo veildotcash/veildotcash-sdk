@@ -8,11 +8,9 @@ SDK and CLI for interacting with [Veil Cash](https://veil.cash) privacy pools on
 
 Generate keypairs, register, deposit, withdraw, transfer, and merge ETH and USDC privately.
 
+`0.8.0` retires subaccounts: the CLI no longer derives forwarder addresses to fund or calls the removed relay deploy/sweep routes. `status`, `merge`, and `recover` remain for funds already in a subaccount.
+
 `0.7.0` adds Coinbase-compatible x402 payments from private USDC balances via deterministic fresh payer EOAs.
-
-`0.6.2` adds `mergeSubaccount` — transfer a subaccount's private pool balance back to the main wallet via a ZK proof. Also adds `veil subaccount merge` CLI command.
-
-`0.6.0` adds SDK-first subaccount support for deterministic slot derivation, forwarder status, relay-backed deploy/sweep, and direct recovery.
 
 ## Installation
 
@@ -85,21 +83,12 @@ veil withdraw ETH 0.05 0xRecipientAddress
 veil transfer ETH 0.02 0xRecipientAddress
 veil merge ETH 0.1
 
-# 8. Work with subaccounts
-veil subaccount derive --slot 0
-veil subaccount status --slot 0
-veil subaccount deploy --slot 0
-veil subaccount sweep --slot 0 --asset eth
-veil subaccount merge --slot 0 --pool eth
-veil subaccount recover --slot 0 --asset usdc --to 0xRecipientAddress --amount 25
-
-# 9. Pay an x402 resource from private USDC in application code
+# 8. Pay an x402 resource from private USDC in application code
 # See SDK.md for payX402Resource().
 
-# 10. Use JSON or unsigned modes when you need automation
+# 9. Use JSON or unsigned modes when you need automation
 veil status --json
 veil deposit ETH 0.1 --unsigned --address 0x...
-veil subaccount status --slot 0 --json
 ```
 
 ## CLI Tasks
@@ -247,23 +236,24 @@ To surface funds left on a payer after a failed payment, use
 `getX402PayerBalances({ rootPrivateKey, startIndex, count, nonZeroOnly })`, which
 returns the Base USDC balance of each derived payer EOA. It is read-only.
 
-### Subaccounts
+### Subaccounts (retired)
 
-Subaccounts are deterministic child slots derived from your main `VEIL_KEY`:
+Subaccounts are retired. **Do not send funds to a subaccount forwarder address**: forwarders can no
+longer be deployed or swept through the relay, so new deposits to them are stuck until Veil support
+intervenes. The remaining commands exist only to recover funds already there.
 
-`root key -> slot -> child key -> child deposit key -> forwarder`
+- `status` shows the slot's forwarder balances, private pool balances, and queue state.
+- `merge` moves the subaccount's private pool balance back to the main wallet via a ZK proof.
+- `recover` withdraws ETH or USDC sitting on a **deployed** forwarder with an owner-signed
+  transaction, submitted on-chain by your CLI gas payer (`WALLET_KEY`).
 
-Base mainnet only. Deploy and sweep are relay-backed. Merge transfers the subaccount's private pool balance back to the main wallet via a ZK proof. Status reports forwarder wallet balances, private pool balances, and queue state for the child slot. Recovery is for assets still sitting on the forwarder after refund or rejection, and is submitted directly on-chain by your CLI gas payer.
+If `status` shows funds on a forwarder that is not deployed, contact Veil support to have it
+deployed, then run `recover`.
 
 ```bash
-veil subaccount derive --slot 0
 veil subaccount status --slot 0
-veil subaccount address --slot 0
-veil subaccount deploy --slot 0
-veil subaccount sweep --slot 0 --asset eth
 veil subaccount merge --slot 0 --pool eth
 veil subaccount recover --slot 0 --asset usdc --to 0xRecipientAddress --amount 25
-veil subaccount status --slot 0 --json
 ```
 
 ## Environment Variables
@@ -287,7 +277,7 @@ The CLI uses two config files:
 | `WALLET_KEY`     | Ethereum wallet private key (for signing transactions)                                         |
 | `SIGNER_ADDRESS` | Ethereum address for unsigned/query flows when signing is handled externally                   |
 | `RPC_URL`        | Base RPC URL (optional, defaults to public RPC)                                                |
-| `RELAY_URL`      | Override relay base URL for relayed CLI operations, subaccount deploy/sweep, and status checks |
+| `RELAY_URL`      | Override relay base URL for relayed CLI operations and status checks |
 
 
 `WALLET_KEY` and `SIGNER_ADDRESS` are mutually exclusive. Use `WALLET_KEY` for commands that sign transactions, and `SIGNER_ADDRESS` for address-only agent flows like `status`, `balance`, and `register --unsigned`.

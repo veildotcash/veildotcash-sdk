@@ -13,7 +13,7 @@
  *   veil withdraw ETH 0.1 0x...      # Withdraw to public address
  *   veil transfer ETH 0.1 0x...      # Transfer privately
  *   veil merge ETH 0.5               # Merge UTXOs (self-transfer)
- *   veil subaccount status --slot 0  # Check subaccount status
+ *   veil subaccount status --slot 0  # Retired subaccount state (recovery only)
  */
 
 import { Command } from 'commander';
@@ -38,7 +38,7 @@ const program = new Command();
 program
   .name('veil')
   .description('CLI for Veil Cash privacy pools on Base')
-  .version('0.6.2')
+  .version('0.8.0')
   .addHelpText('after', `
 Getting started:
   veil init

@@ -1,11 +1,11 @@
 ---
 name: veil
-version: 0.6.2
+version: 0.8.0
 description: >
   Veil CLI for private ETH and USDC transactions on Base. Use when the user wants
   to deposit, withdraw, or transfer assets privately, check private balances,
-  manage Veil keypairs, register on-chain, manage deterministic subaccounts
-  (forwarder deploy, sweep, merge to main wallet, recover), or build unsigned
+  manage Veil keypairs, register on-chain, recover funds from retired
+  subaccounts (status, merge to main wallet, recover), or build unsigned
   transaction payloads for an external signer (e.g. Bankr). All operations
   target Base (chain ID 8453).
 author: veildotcash
@@ -171,7 +171,7 @@ What do you want to do?
 |
 +-- Withdraw / transfer / merge       → Section 5
 |
-+-- Subaccounts (forwarders)          → Section 5B
++-- Retired subaccounts (recovery)   → Section 5B
 |
 +-- Inspect or rotate keypair         → veil keypair / veil init --force
 ```
@@ -197,11 +197,7 @@ What do you want to do?
 | Withdraw | `veil withdraw ETH 0.05 0xRecipient` |
 | Transfer privately | `veil transfer ETH 0.02 0xRecipient` |
 | Merge UTXOs | `veil merge ETH 0.1` |
-| Derive subaccount | `veil subaccount derive --slot 0` |
-| Subaccount status | `veil subaccount status --slot 0` |
-| Subaccount address | `veil subaccount address --slot 0` |
-| Deploy forwarder | `veil subaccount deploy --slot 0` |
-| Sweep forwarder | `veil subaccount sweep --slot 0 --asset eth` |
+| Subaccount status (retired, recovery only) | `veil subaccount status --slot 0` |
 | Merge subaccount to main | `veil subaccount merge --slot 0 --pool eth` |
 | Recover from forwarder | `veil subaccount recover --slot 0 --asset usdc --to 0xAddr --amount 25` |
 
@@ -424,40 +420,29 @@ Note: withdraw proof generation is single-threaded for reliable CLI exit after s
 
 ---
 
-## 5B. Subaccounts
+## 5B. Subaccounts (retired — recovery only)
 
-Subaccounts are deterministic child slots derived from your main `VEIL_KEY`:
+Subaccounts are retired. **Never tell a user to send funds to a subaccount
+forwarder address, and never derive one for them to fund.** Forwarders can no
+longer be deployed or swept through the relay; the `derive`, `address`,
+`deploy`, and `sweep` commands were removed in 0.8.0. If a user asks for a
+subaccount, stealth address, or forwarder to receive funds, explain that the
+feature is retired and use a normal private deposit, transfer, or withdraw
+instead.
 
-`root key → slot → child key → child deposit key → forwarder`
+The remaining commands exist only to recover funds already in a subaccount
+(slots `0`–`2`, derived from the main `VEIL_KEY`, Base mainnet only).
 
-Base mainnet only. Slots are `0`–`2` (max 3 subaccounts). Deploy and sweep are
-relay-backed (no `WALLET_KEY` needed). Merge transfers the subaccount's private
-pool balance back to the main wallet via a ZK proof (relay-backed, no `WALLET_KEY`
-needed). Recovery submits a direct on-chain transaction and **requires `WALLET_KEY`**
-as a gas payer.
-
-Status reports the child slot's forwarder wallet balances, private pool
-balances, and queue state.
-
-### Derive and inspect
+### Inspect
 
 ```bash
-veil subaccount derive --slot 0           # Full slot metadata
-veil subaccount derive --slot 0 --json
-veil subaccount address --slot 0          # Just the forwarder address
-veil subaccount status --slot 0           # Deployment, forwarder balances, private balances, queue state
+veil subaccount status --slot 0           # Forwarder balances, private balances, queue state
 veil subaccount status --slot 0 --json
 ```
 
-### Deploy and sweep (relay-backed)
-
-```bash
-veil subaccount deploy --slot 0           # Deploy the forwarder contract
-veil subaccount deploy --slot 0 --json
-veil subaccount sweep --slot 0 --asset eth    # Sweep ETH into the pool
-veil subaccount sweep --slot 0 --asset usdc   # Sweep USDC into the pool
-veil subaccount sweep --slot 0 --asset eth --json
-```
+The forwarder address in the output is for recovery only. If the forwarder
+holds funds but is **not deployed**, the user must contact Veil support to have
+it deployed, then run `recover`.
 
 ### Merge subaccount to main wallet (relay-backed)
 
@@ -473,9 +458,9 @@ veil subaccount merge --slot 0 --pool eth --json
 
 ### Recover (direct on-chain — requires WALLET_KEY)
 
-Recovery is for assets still sitting on the forwarder after refund or rejection.
-It signs a forwarder withdraw with the child key and submits the transaction
-using `WALLET_KEY` as the gas payer.
+Recovery withdraws assets sitting on a **deployed** forwarder. It signs a
+forwarder withdraw with the child key and submits the transaction using
+`WALLET_KEY` as the gas payer.
 
 ```bash
 veil subaccount recover --slot 0 --asset usdc --to 0xRecipient --amount 25
@@ -486,7 +471,6 @@ Important:
 
 - `--asset` is `eth` or `usdc` (case-insensitive in the CLI)
 - `--slot` is `0`–`2`
-- Deploy and sweep only need `VEIL_KEY`
 - Merge only needs `VEIL_KEY`
 - Recover needs both `VEIL_KEY` and `WALLET_KEY`
 

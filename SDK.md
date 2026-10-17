@@ -10,7 +10,7 @@ If you are looking for the CLI first-run flow, go back to the main [README](./RE
 import {
   Keypair, buildRegisterTx, buildDepositETHTx,
   buildDepositUSDCTx, buildApproveUSDCTx,
-  withdraw, transfer, getSubaccountStatus, mergeSubaccount,
+  withdraw, transfer,
   payX402Resource,
 } from '@veil-cash/sdk';
 import { createWalletClient, http } from 'viem';
@@ -66,14 +66,7 @@ const transferResult = await transfer({
   pool: 'eth', // 'eth' | 'usdc' (default: 'eth')
 });
 
-// 7. Inspect a deterministic subaccount slot
-const subaccount = await getSubaccountStatus({
-  rootPrivateKey: keypair.privkey as `0x${string}`,
-  slot: 0,
-});
-console.log(subaccount.slot.forwarderAddress);
-
-// 8. Pay an x402 resource from private USDC
+// 7. Pay an x402 resource from private USDC
 const paid = await payX402Resource({
   url: 'https://merchant.example/paid-resource',
   rootPrivateKey: keypair.privkey as `0x${string}`,
@@ -320,52 +313,31 @@ const privateBalance = await getPrivateBalance({
 
 ```
 
-### Subaccounts
+### Subaccounts (retired)
 
-Subaccounts are deterministic child slots derived from your main Veil key:
+Subaccounts are retired. **Do not send funds to a subaccount forwarder address.** The relay
+deploy/sweep routes are gone and `deploySubaccountForwarder` / `sweepSubaccountForwarder` were
+removed in 0.8.0. The remaining helpers exist only to recover funds already in a subaccount:
 
-`root key -> slot -> child key -> child deposit key -> forwarder`
-
-Base mainnet only. Status shows the child slot's forwarder wallet balances, private pool balances, and queue state. Deploy and sweep are relay-backed. Merge transfers the subaccount's private pool balance back to the main wallet via a ZK proof. Recovery signs a forwarder withdraw request with the child key and returns a direct transaction for your gas payer to submit.
+- `getSubaccountStatus` reports forwarder wallet balances, private pool balances, and queue state,
+  plus `retired: true` and a `notice` (`SUBACCOUNT_RETIRED_NOTICE`) to show with any address.
+- `mergeSubaccount` moves the subaccount's private pool balance back to the main wallet via a ZK proof.
+- `buildSubaccountRecoveryTx` signs a forwarder `withdraw` with the child key and returns a direct
+  transaction for your gas payer to submit. It requires a **deployed** forwarder; if funds sit on an
+  undeployed forwarder, contact Veil support to have it deployed first.
 
 ```typescript
 import {
-  deriveSubaccountSlot,
-  getSubaccountPrivateBalance,
   getSubaccountStatus,
-  deploySubaccountForwarder,
-  sweepSubaccountForwarder,
   mergeSubaccount,
   buildSubaccountRecoveryTx,
 } from '@veil-cash/sdk';
-
-const slot = await deriveSubaccountSlot({
-  rootPrivateKey: veilKey,
-  slot: 0,
-});
 
 const status = await getSubaccountStatus({
   rootPrivateKey: veilKey,
   slot: 0,
 });
-// status.privateBalances.eth.privateBalance, status.privateBalances.usdc.privateBalance
-
-const privateBalance = await getSubaccountPrivateBalance({
-  rootPrivateKey: veilKey,
-  slot: 0,
-  pool: 'eth',
-});
-// privateBalance.privateBalance, privateBalance.unspentCount
-
-await deploySubaccountForwarder({
-  rootPrivateKey: veilKey,
-  slot: 0,
-});
-
-await sweepSubaccountForwarder({
-  forwarderAddress: slot.forwarderAddress,
-  asset: 'eth',
-});
+// status.deployed, status.balances.usdc.balance, status.privateBalances.eth.privateBalance
 
 // Merge subaccount's private pool balance back to the main wallet
 const mergeResult = await mergeSubaccount({
@@ -373,8 +345,8 @@ const mergeResult = await mergeSubaccount({
   slot: 0,
   pool: 'eth', // 'eth' | 'usdc' (default: 'eth')
 });
-// mergeResult.amount, mergeResult.transactionHash
 
+// Withdraw funds sitting on a deployed forwarder
 const recovery = await buildSubaccountRecoveryTx({
   rootPrivateKey: veilKey,
   slot: 0,

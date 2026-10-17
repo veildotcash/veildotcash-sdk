@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.8.0
+
+- **Breaking**: Retire subaccounts. Remove `deploySubaccountForwarder()`, `sweepSubaccountForwarder()`, and the `SubaccountDeployRequest`, `SubaccountSweepRequest`, and `SubaccountRelayResult` types; the relay `/stealth/deploy` and `/stealth/sweep` routes they called no longer exist
+- **Breaking**: Remove `veil subaccount derive`, `address`, `deploy`, and `sweep` CLI commands so the CLI no longer hands out forwarder addresses to fund
+- Keep `veil subaccount status`, `merge`, and `recover` for funds already in a subaccount; `status` labels the forwarder address as do-not-fund and prints recovery guidance
+- Add `retired` and `notice` fields to `SubaccountStatusResult` and export `SUBACCOUNT_RETIRED_NOTICE`
+- `buildSubaccountRecoveryTx()` now explains that an undeployed forwarder needs Veil support before recovery
+- Fix `veil --version` reporting a stale version
+- Remove the subaccount funding flow from `README.md`, `SDK.md`, and the agent skill
+
 ## 0.6.2
 
 - Add `mergeSubaccount()` SDK function to transfer a subaccount's entire private pool balance back to the main wallet via a ZK transfer proof

@@ -143,38 +143,27 @@ const priv = await getPrivateBalance({
 });
 ```
 
-### Subaccounts
+### Subaccounts (retired — recovery only)
+
+Subaccounts are retired. Do not derive or hand out forwarder addresses for
+funding; `deploySubaccountForwarder` and `sweepSubaccountForwarder` were removed
+in 0.8.0. These helpers only recover funds already in a subaccount.
 
 ```typescript
 import {
-  deriveSubaccountSlot,
-  getSubaccountPrivateBalance,
   getSubaccountStatus,
-  deploySubaccountForwarder,
-  sweepSubaccountForwarder,
+  getSubaccountPrivateBalance,
   mergeSubaccount,
   buildSubaccountRecoveryTx,
-  isSubaccountForwarderDeployed,
   MAX_SUBACCOUNT_SLOTS,
 } from '@veil-cash/sdk';
-
-// Derive slot metadata (child key, salt, predicted forwarder address)
-const slot = await deriveSubaccountSlot({
-  rootPrivateKey: '0xVEIL_KEY',
-  slot: 0,           // 0–2
-});
-// slot.forwarderAddress, slot.childOwner, slot.childDepositKey, slot.salt
-
-// Check deployment status
-const deployed = await isSubaccountForwarderDeployed({
-  forwarderAddress: slot.forwarderAddress,
-});
 
 // Full status (deployment, forwarder balances, private balances, queue state)
 const status = await getSubaccountStatus({
   rootPrivateKey: '0xVEIL_KEY',
-  slot: 0,
+  slot: 0,           // 0–2
 });
+// status.retired === true, status.notice — show the notice with any forwarder address
 // status.deployed, status.balances, status.privateBalances, status.queues
 
 // Private pool balance for a single slot + pool
@@ -183,20 +172,6 @@ const privateBalance = await getSubaccountPrivateBalance({
   slot: 0,
   pool: 'eth',
 });
-// privateBalance.privateBalance, privateBalance.unspentCount, privateBalance.utxos
-
-// Deploy forwarder (relay-backed, no WALLET_KEY needed)
-const deployResult = await deploySubaccountForwarder({
-  rootPrivateKey: '0xVEIL_KEY',
-  slot: 0,
-});
-// deployResult.transactionHash, deployResult.slot.forwarderAddress
-
-// Sweep assets into pool (relay-backed)
-const sweepResult = await sweepSubaccountForwarder({
-  forwarderAddress: slot.forwarderAddress,
-  asset: 'eth',     // 'eth' | 'usdc'
-});
 
 // Merge subaccount's private balance back to main wallet (relay-backed)
 const mergeResult = await mergeSubaccount({
@@ -204,9 +179,10 @@ const mergeResult = await mergeSubaccount({
   slot: 0,
   pool: 'eth',     // 'eth' | 'usdc' (default: 'eth')
 });
-// mergeResult.success, mergeResult.transactionHash, mergeResult.amount, mergeResult.slot, mergeResult.pool
+// mergeResult.success, mergeResult.transactionHash, mergeResult.amount
 
-// Build recovery transaction (for assets stuck on forwarder)
+// Build recovery transaction for assets on a deployed forwarder.
+// Throws if the forwarder is not deployed — the user must contact Veil support first.
 const recovery = await buildSubaccountRecoveryTx({
   rootPrivateKey: '0xVEIL_KEY',
   slot: 0,
@@ -233,7 +209,7 @@ Install globally: `npm install -g @veil-cash/sdk`
 | `WALLET_KEY` | Ethereum wallet private key (for signing) |
 | `SIGNER_ADDRESS` | Ethereum address for unsigned/query flows when signing is external |
 | `RPC_URL` | Base RPC URL (optional, defaults to public RPC) |
-| `RELAY_URL` | Override relay base URL for relayed CLI operations, subaccount deploy/sweep, and status checks |
+| `RELAY_URL` | Override relay base URL for relayed CLI operations and status checks |
 
 `WALLET_KEY` and `SIGNER_ADDRESS` are mutually exclusive. Use `SIGNER_ADDRESS` only for address-only CLI flows.
 
@@ -271,15 +247,9 @@ veil balance queue --address 0x... --json          # Queue balance for explicit 
 veil balance private --pool eth                    # Private-only balance
 veil balance private --json                        # Private balance as JSON
 
-veil subaccount derive --slot 0                    # Derive slot metadata
-veil subaccount derive --slot 0 --json             # Derive as JSON
-veil subaccount address --slot 0                   # Print forwarder address
-veil subaccount status --slot 0                    # Deployment, forwarder balances, private balances, queue state
+# Subaccounts are retired: these commands only recover existing funds.
+veil subaccount status --slot 0                    # Forwarder balances, private balances, queue state
 veil subaccount status --slot 0 --json             # Status as JSON
-veil subaccount deploy --slot 0                    # Deploy forwarder (relay-backed)
-veil subaccount deploy --slot 0 --json             # Deploy as JSON
-veil subaccount sweep --slot 0 --asset eth         # Sweep ETH into pool (relay-backed)
-veil subaccount sweep --slot 0 --asset usdc --json # Sweep USDC as JSON
 veil subaccount merge --slot 0 --pool eth          # Merge subaccount balance to main wallet
 veil subaccount merge --slot 0 --pool usdc --json  # Merge USDC as JSON
 veil subaccount recover --slot 0 --asset usdc --to 0x... --amount 25   # Recover assets (needs WALLET_KEY)
